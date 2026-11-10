@@ -164,7 +164,7 @@ class DeviceHub(ctx: Context, private val keys: OwnerKeyStore, private val store
         eventFlow.tryEmit("Connection settings saved")
         return true
     }
-\n    /** Call after the user grants Bluetooth permissions. */
+    /** Call after the user grants Bluetooth permissions. */
     fun onPermissionsChanged() { scope.launch { ble.ensureScanning() } }
 
     fun rescan() { scope.launch { sendDiscover() } }
