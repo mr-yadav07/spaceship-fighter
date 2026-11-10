@@ -1,28 +1,28 @@
-# RGB IoT Controller
+# ESP Control Studio
 
-Android project for controlling ESP devices over BLE and local Wi-Fi UDP, with optional internet relay support.
+Native Android application for discovering and controlling ESP devices over Bluetooth Low Energy (BLE), local Wi-Fi UDP, and an optional UDP relay.
 
-## Build APK with GitHub Actions
+## Build APK
 
-1. Upload `ESPControlStudio-GitHubBuild.zip` to the repository root without renaming it.
-2. Commit the upload to `main`.
-3. The Android APK workflow starts automatically.
-4. Open **Actions** and download the `ESPControlStudio-debug-apk` artifact from the completed run.
+The complete Android project source is stored directly in this repository. Every push to `main` starts the Android build workflow.
 
-The workflow extracts the project, installs Java 17, Gradle 8.13 and Android SDK 36, then runs `:app:assembleDebug`.
+1. Open the **Actions** tab.
+2. Select the **Android APK** workflow run.
+3. Download the `ESPControlStudio-debug-apk` artifact after the run succeeds.
 
-## Runtime configuration (no rebuild required)
+## App configuration
 
-After installing the APK, open **Settings → Connection config** to edit:
-- BLE service, command and events UUIDs
-- BLE advertised device-name prefix
-- Local UDP app listening port and ESP device port
-- Optional relay hostname/IP and UDP port
+Open **Settings → Connection config** in the app.
 
-Open **Settings → Security (Owner Key)** to change the Owner Key. Settings persist locally on the phone.
+- BLE service, command, and event UUIDs must match the GATT service implemented by the ESP firmware.
+- The BLE advertised-name prefix must match the firmware's device name.
+- Local UDP ports must match the firmware protocol settings.
+- Relay hostname and UDP port are optional. Leave the hostname blank to disable relay.
 
-These values must match the ESP firmware. Editing app settings does not automatically reconfigure firmware.
+Open **Settings → Security (Owner Key)** to configure the Owner Key. It must match the key configured on the ESP devices.
 
-## Requirements for real hardware
+Connection settings are stored locally on the phone. Changing these settings does not require rebuilding the APK.
 
-The ESP firmware must implement the ESPCTL packet format and authentication handshake described in `docs/PROTOCOL.md`. Internet relay requires a compatible relay server; leave the relay hostname blank to disable it. The workflow produces a debug APK, not a Play Store-signed release.
+## Scope
+
+This repository contains the Android client only. It does not include ESP firmware or a relay server. The app and firmware must implement the same ESPCTL packet format and compatible authentication handshake.
