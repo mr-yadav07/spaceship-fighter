@@ -103,8 +103,8 @@ class BleTransport(private val ctx: Context) : Transport {
     private val scanCb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val name = result.scanRecord?.deviceName ?: result.device.name ?: return
-            if (!name.startsWith(NAME_PREFIX)) return
-            val id = name.removePrefix(NAME_PREFIX).lowercase()
+            if (!name.startsWith(namePrefix)) return
+            val id = name.removePrefix(namePrefix).lowercase()
             if (id.length != 12) return
             advertFlow.tryEmit(Advert(result.device.address, id, name, result.rssi))
         }
