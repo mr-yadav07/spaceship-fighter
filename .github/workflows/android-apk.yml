@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'ESPControlStudio.zip'
+      - 'ESPControlStudio-GitHubBuild.zip'
   workflow_dispatch:
 
 permissions:
@@ -19,8 +20,10 @@ jobs:
 
       - name: Extract Android project
         run: |
-          test -f ESPControlStudio.zip || { echo "ESPControlStudio.zip is missing from repository root"; exit 1; }
-          unzip -q ESPControlStudio.zip -d source
+          ARCHIVE=ESPControlStudio.zip
+          if [ -f ESPControlStudio-GitHubBuild.zip ]; then ARCHIVE=ESPControlStudio-GitHubBuild.zip; fi
+          test -f "$ARCHIVE" || { echo "Upload ESPControlStudio-GitHubBuild.zip (or ESPControlStudio.zip) to the repository root"; exit 1; }
+          unzip -q "$ARCHIVE" -d source
           test -f source/ESPControlStudio/app/build.gradle.kts
 
       - name: Set up Java
