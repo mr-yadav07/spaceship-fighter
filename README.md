@@ -1,10 +1,10 @@
 # RGB IoT Controller
 
-Android application source is supplied as `ESPControlStudio.zip` in the repository root.
+Android application source is supplied as `ESPControlStudio-GitHubBuild.zip` (or `ESPControlStudio.zip`) in the repository root.
 
 ## Build APK with GitHub Actions
 
-1. Upload `ESPControlStudio.zip` to the repository root (do not rename it).
+1. Upload the prepared `ESPControlStudio-GitHubBuild.zip` to the repository root (keep its filename).
 2. Commit the upload to `main`.
 3. Open **Actions → Build Android APK**.
 4. Download the `ESPControlStudio-debug-apk` artifact from the completed run.
