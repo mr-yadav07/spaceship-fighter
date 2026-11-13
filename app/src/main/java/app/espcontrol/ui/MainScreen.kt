@@ -505,7 +505,7 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
                 .padding(14.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            T("Firmware / GPIO setup", 17f, weight = FontWeight.SemiBold)
+            T("Firmware / Candidate setup", 17f, weight = FontWeight.SemiBold)
             T("Configure any number of logical candidates. IDs are local to this ESP32; GPIO mapping stays in firmware hardware hooks.", 11.5f, C.Muted)
             ConfigInput("RGB candidate IDs (comma separated)", rgbIds) { rgbIds = it }
             ConfigInput("LED counts in matching order", ledCounts) { ledCounts = it }
