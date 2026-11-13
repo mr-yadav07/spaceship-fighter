@@ -206,7 +206,7 @@ static void handleCommand(const uint8_t* d,size_t n) {
       cmd.kind=EFFECT_KIND; cmd.a=p[i++]; cmd.b=p[i++];
     }
     enqueueCommand(cmd);
-  
+  }
 }
 class CommandCallbacks: public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c,NimBLEConnInfo&) override {
