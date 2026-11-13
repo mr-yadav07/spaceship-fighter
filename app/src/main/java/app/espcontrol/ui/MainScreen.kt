@@ -341,19 +341,19 @@ private fun ConnectionSheet(vm: ControlViewModel, onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             T("Connection configuration", 17f, weight = FontWeight.SemiBold)
-            T("Change protocol settings here after installing the APK. UUIDs must match your ESP firmware.", 11.5f, C.Muted)
+            T("BLE Protocol v2 only. UUIDs and advertised-name prefix must match your ESP32 firmware. UDP and relay are not used.", 11.5f, C.Muted)
             T("BLE", 13f, C.Orange, weight = FontWeight.SemiBold)
             ConfigInput("Service UUID", service) { service = it }
             ConfigInput("Command characteristic UUID", command) { command = it }
             ConfigInput("Events characteristic UUID", events) { events = it }
             ConfigInput("Advertised name prefix", prefix) { prefix = it }
-            T("Internet relay (optional)", 13f, C.Orange, weight = FontWeight.SemiBold)
+            T("Legacy relay fields (unused in v2)", 13f, C.Muted, weight = FontWeight.SemiBold)
             ConfigInput("Relay hostname / IP (blank disables)", relayHost) { relayHost = it }
             ConfigInput("Relay UDP port", relayPort) { relayPort = it }
-            T("Local Wi-Fi UDP", 13f, C.Orange, weight = FontWeight.SemiBold)
+            T("Legacy UDP fields (unused in v2)", 13f, C.Muted, weight = FontWeight.SemiBold)
             ConfigInput("App listen port", udpAppPort) { udpAppPort = it }
             ConfigInput("ESP device listen port", udpDevicePort) { udpDevicePort = it }
-            T("Both UDP ports must match the values configured in your ESP firmware.", 10.5f, C.Muted)
+            T("Only BLE GATT settings are active in this protocol version.", 10.5f, C.Muted)
             if (error.isNotBlank()) T(error, 11f, C.Danger)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 PillButton("Save", 90.dp, {
@@ -515,7 +515,7 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
             PillButton("Copy GPIO configuration", 190.dp, {
                 clipboard.setText(androidx.compose.ui.text.AnnotatedString(config))
             }, primary = true)
-            T("Firmware compatibility note: the Android app currently uses authenticated ESPCTL BLE packets. The uploadable ESP32 firmware must implement the matching ESPCTL handshake, encryption, CAPS extension and notifications. This screen currently generates the GPIO configuration only; do not upload a standalone GPIO sketch as it would not communicate with this app.", 11f, C.Warn)
+            T("Firmware uses BLE Protocol v2. Candidate IDs, LED counts and effect catalogue are configured in the firmware descriptor array; GPIO mapping and hardware callbacks are implemented there. This panel only generates a configuration snippet.", 11f, C.Warn)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
         }
     }
