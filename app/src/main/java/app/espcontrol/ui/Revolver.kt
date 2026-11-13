@@ -70,7 +70,8 @@ private const val SPACING = B * STEP
 private fun slots(n: Int, rot: Float): List<Slot> = (0 until n).map { i ->
     var d = (((i - rot) % n) + n) % n
     if (d > n / 2f) d -= n
-    val step = if (n <= 9) 0.34f else STEP\n    val th = d * step
+    val step = if (n <= 9) 0.34f else STEP
+    val th = d * step
     val c = cos(th)
     val vis = c > 0.3f
     Slot(
