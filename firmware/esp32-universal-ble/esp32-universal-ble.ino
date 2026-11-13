@@ -61,7 +61,7 @@ static bool hasEffect(uint8_t id) {
   return false;
 }
 static void sendFrame(uint8_t type,const std::vector<uint8_t>& p) {
-  if(!eventChar || p.size()>512) return;
+  if(!eventChar || p.size()>508) return;
   std::vector<uint8_t> f={MAGIC0,MAGIC1,VERSION,type,uint8_t(p.size()),uint8_t(p.size()>>8)};
   f.insert(f.end(),p.begin(),p.end());
   eventChar->setValue(f.data(),f.size());
@@ -154,8 +154,8 @@ class CommandCallbacks: public NimBLECharacteristicCallbacks {
 };
 void setup() {
   Serial.begin(115200);
-  NimBLEDevice::init(String("ESPC-")+String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFFFFFFFFULL),HEX));
-  NimBLEDevice::setMTU(185);
+  char devName[18]; snprintf(devName, sizeof(devName), "ESPC-%012llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFFFFFFFFULL));\n  NimBLEDevice::init(std::string(devName));
+  NimBLEDevice::setMTU(517);
   auto *server=NimBLEDevice::createServer();
   auto *service=server->createService(SERVICE_UUID);
   auto *cmd=service->createCharacteristic(COMMAND_UUID,NIMBLE_PROPERTY::WRITE|NIMBLE_PROPERTY::WRITE_NR);
