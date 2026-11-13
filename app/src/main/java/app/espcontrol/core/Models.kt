@@ -5,8 +5,8 @@ enum class RouteKind { LOCAL_UDP, BLE, RELAY_UDP }
 
 enum class LinkState { OFFLINE, CONNECTING, ONLINE, UNAUTHORIZED }
 
-data class RgbOutput(val id: Int, val leds: Int)
-data class OnOffOutput(val id: Int)
+data class RgbOutput(val id: Int, val leds: Int, val name: String = "")
+data class OnOffOutput(val id: Int, val name: String = "")
 data class EffectCapability(val id: Int, val name: String)
 
 data class Capabilities(
