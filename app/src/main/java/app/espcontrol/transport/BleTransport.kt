@@ -147,7 +147,7 @@ class BleTransport(private val ctx: Context) : Transport {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             val addr = g.device.address
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                g.requestMtu(185)
+                g.requestMtu(517)
             } else {
                 conns.remove(addr)
                 try { g.close() } catch (e: Exception) { /* ignore */ }
