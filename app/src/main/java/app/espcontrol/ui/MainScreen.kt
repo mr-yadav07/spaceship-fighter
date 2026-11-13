@@ -206,7 +206,7 @@ private fun SideColumn(
     panel: Panel, onSettings: () -> Unit, onScan: () -> Unit,
     onRgb: () -> Unit, onSwitch: () -> Unit, onMenu: () -> Unit,
 ) {
-    Column(Modifier.offset(y = 294.dp), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+    Column(Modifier.offset(306.dp, 294.dp), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
         SideBtn(panel == Panel.SETTINGS, onSettings) { GearIcon() }
         SideBtn(panel == Panel.SCAN, onScan) { T("Scan", 11f) }
         SideBtn(panel == Panel.RGB, onRgb) { T("RGB", 11f) }
