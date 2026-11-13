@@ -43,6 +43,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
     private val eventFlow = MutableSharedFlow<String>(extraBufferCapacity=16,onBufferOverflow=BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<String> = eventFlow.asSharedFlow()
     private var started=false
+    private val savedPairs by lazy { store.load().associateBy { it.id.lowercase() } }
 
     private data class Link(
         val id:String, val address:String, var name:String, var state:LinkState=LinkState.OFFLINE,
@@ -55,10 +56,6 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         if(started) return
         started=true
         scope.launch {
-            store.load().forEach { p ->
-                val l=links[p.id.lowercase()]
-                if(l!=null) { l.name=p.name.ifBlank { l.name }; l.paired=true }
-            }
             launch { ble.incoming.collect { onRx(it) } }
             launch { ble.adverts.collect { onAdvert(it) } }
             launch { ble.ready.collect { ready ->
@@ -81,6 +78,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         val id=a.deviceId.lowercase()
         val l=links[id] ?: Link(id,a.address,a.name).also { links[id]=it }
         l.name=a.name
+        savedPairs[id]?.let { saved -> l.name=saved.name.ifBlank { l.name }; l.paired=true }
         byAddress[a.address]=id
         publish()
     }
@@ -116,7 +114,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
 
     private fun publish() {
         devicesFlow.value=links.values.map { l ->
-            DeviceInfo(l.id,l.name,0,true,l.paired,l.state,
+            DeviceInfo(l.id,l.name,0,false,l.paired,l.state,
                 if(l.address.isNotBlank()) setOf(RouteKind.BLE) else emptySet(),
                 if(l.state==LinkState.ONLINE) RouteKind.BLE else null,l.caps,
                 HashMap(l.rgb),HashMap(l.switches),l.lastError)
