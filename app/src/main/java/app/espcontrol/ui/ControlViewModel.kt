@@ -256,7 +256,7 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         msg(if (ok) "Connection settings saved" else "Invalid UUID, prefix or relay port")
         return ok
     }
-    fun changeOwnerKey(k: String) { hub.changeOwnerKey(k); msg("Owner Key updated") }
+    fun changeOwnerKey(k: String) { espApp.keys.set(k); hub.changeOwnerKey(k); msg("Legacy local setting saved; BLE v2 does not use it") }
 
     fun setMode(m: ScrollMode) { prefs.edit().putString("mode", m.name).apply(); local.update { it.copy(mode = m) } }
     fun setSens(v: Int) {
