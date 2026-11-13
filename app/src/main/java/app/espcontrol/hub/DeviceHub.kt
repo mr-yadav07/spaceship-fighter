@@ -119,14 +119,11 @@ class DeviceHub(ctx: Context, private val keys: OwnerKeyStore, private val store
                 l.name = p.name.ifBlank { l.name }; l.type = p.type; l.paired = true
             }
             publish()
-            listOf(ble, udp, relay).forEach { t -> launch { t.incoming.collect { onRx(it) } } }
+            launch { ble.incoming.collect { onRx(it) } }
             launch { ble.adverts.collect { a -> onAdvert(a) } }
             launch { ble.ready.collect { publish() } }
             ble.start(this)
-            udp.start(this)
-            relay.start(this)
-            watchNetwork()
-            launch { discoveryLoop() }
+            // BLE-only phase: UDP and relay transports remain configurable placeholders.
             launch { housekeeping() }
         }
     }
