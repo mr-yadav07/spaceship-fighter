@@ -45,7 +45,7 @@ import app.espcontrol.core.LinkState
 import app.espcontrol.core.RouteKind
 
 private enum class Panel { NONE, SETTINGS, SCAN, RGB, SWITCH, MENU }
-private enum class Sheet { NONE, DEVICES, SECURITY, SCROLL, CONNECTION }
+private enum class Sheet { NONE, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
 
 @Composable
 fun MainScreen(vm: ControlViewModel) {
@@ -124,6 +124,8 @@ fun MainScreen(vm: ControlViewModel) {
                 Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
                 Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
                 Sheet.SCROLL -> ScrollSheet(s, vm) { sheet = Sheet.NONE }
+                Sheet.EFFECTS -> EffectsSheet(s, vm) { sheet = Sheet.NONE }
+                Sheet.FIRMWARE -> FirmwareSheet(s) { sheet = Sheet.NONE }
                 else -> {}
             }
         }
@@ -274,7 +276,7 @@ private fun ListRevolver(
 
 @Composable
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, openSheet: (Sheet) -> Unit) {
-    val items = listOf("Devices" to Sheet.DEVICES, "Connection config" to Sheet.CONNECTION, "Security (Owner Key)" to Sheet.SECURITY, "Scroll" to Sheet.SCROLL, "Demo data" to Sheet.NONE)
+    val items = listOf("Devices" to Sheet.DEVICES, "Effects catalogue" to Sheet.EFFECTS, "Firmware / GPIO setup" to Sheet.FIRMWARE, "Connection config" to Sheet.CONNECTION, "Security (Owner Key)" to Sheet.SECURITY, "Scroll" to Sheet.SCROLL, "Demo data" to Sheet.NONE)
     Revolver(
         items = items.mapIndexed { i, (n, _) -> RevItem(n, sel = false, on = i == 4 && s.demo, dot = null) },
         mode = s.mode, sens = s.sens[s.mode] ?: 0,
@@ -436,6 +438,84 @@ private fun ScrollSheet(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
             }
             HSlider(s.sens[s.mode] ?: 0, 100, C.Accent, { vm.setSens(it) }, Modifier.fillMaxWidth())
             T("0% = turns exactly as much as you scroll. 100% = even a small scroll turns a lot.", 11.5f, C.Muted)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
+        }
+    }
+}
+
+
+@Composable
+private fun EffectsSheet(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
+    val effects = s.devices.filter { it.state == LinkState.ONLINE }
+        .flatMap { d -> d.caps?.effects.orEmpty().map { it.name } }
+        .distinctBy { it.lowercase() }.sorted()
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.offset(42.dp, 150.dp).width(314.dp).height(520.dp)
+                .clip(RoundedCornerShape(24.dp)).background(C.Card).border(1.dp, C.Line, RoundedCornerShape(24.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            T("Effects catalogue", 17f, weight = FontWeight.SemiBold)
+            T("Names are discovered from connected ESP32 devices. A selected device runs an effect only when it advertises that name; its local effect ID is resolved independently.", 11.5f, C.Muted)
+            T("${s.selRgb.size} RGB candidates selected", 11f, C.Orange, weight = FontWeight.SemiBold)
+            LazyColumn(Modifier.weight(1f)) {
+                items(effects) { name ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x12FFFFFF))
+                            .clickable { vm.triggerEffectByName(name) }.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        T(name, 13f, weight = FontWeight.Medium)
+                        T("RUN", 10f, C.Green, FontWeight.Bold)
+                    }
+                }
+                if (effects.isEmpty()) item {
+                    T("No effect catalogue received yet. Connect a device running firmware that advertises its effects in CAPS.", 12f, C.Muted)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
+        }
+    }
+}
+
+@Composable
+private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var rgb1 by remember { mutableStateOf("16") }
+    var rgb2 by remember { mutableStateOf("17") }
+    var sw1 by remember { mutableStateOf("18") }
+    var sw2 by remember { mutableStateOf("19") }
+    var low1 by remember { mutableStateOf(false) }
+    var low2 by remember { mutableStateOf(false) }
+    val config = "RGB1_DATA_PIN=${rgb1}\nRGB2_DATA_PIN=${rgb2}\nRGB_LED_COUNT=64\nSWITCH1_PIN=${sw1}\nSWITCH1_ACTIVE_LOW=${low1}\nSWITCH2_PIN=${sw2}\nSWITCH2_ACTIVE_LOW=${low2}"
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.offset(34.dp, 82.dp).width(330.dp).height(660.dp)
+                .clip(RoundedCornerShape(24.dp)).background(C.Card).border(1.dp, C.Line, RoundedCornerShape(24.dp))
+                .padding(14.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            T("Firmware / GPIO setup", 17f, weight = FontWeight.SemiBold)
+            T("Configure two addressable RGB outputs (64 LEDs each) and two independent switch outputs. These are hardware settings, not app command IDs.", 11.5f, C.Muted)
+            ConfigInput("RGB 1 data GPIO", rgb1) { rgb1 = it }
+            ConfigInput("RGB 2 data GPIO", rgb2) { rgb2 = it }
+            ConfigInput("Switch 1 GPIO", sw1) { sw1 = it }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                T("Switch 1 active LOW", 12f)
+                androidx.compose.material3.Switch(checked = low1, onCheckedChange = { low1 = it })
+            }
+            ConfigInput("Switch 2 GPIO", sw2) { sw2 = it }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                T("Switch 2 active LOW", 12f)
+                androidx.compose.material3.Switch(checked = low2, onCheckedChange = { low2 = it })
+            }
+            T("Generated configuration", 12f, C.Orange, FontWeight.SemiBold)
+            T(config, 11f, C.Text)
+            PillButton("Copy GPIO configuration", 190.dp, {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(config))
+            }, primary = true)
+            T("Firmware compatibility note: the Android app currently uses authenticated ESPCTL BLE packets. The uploadable ESP32 firmware must implement the matching ESPCTL handshake, encryption, CAPS extension and notifications. This screen currently generates the GPIO configuration only; do not upload a standalone GPIO sketch as it would not communicate with this app.", 11f, C.Warn)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
         }
     }
