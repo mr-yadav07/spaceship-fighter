@@ -1,6 +1,7 @@
 package app.espcontrol.protocol
 
 import app.espcontrol.core.Capabilities
+import app.espcontrol.core.EffectCapability
 import app.espcontrol.core.OnOffOutput
 import app.espcontrol.core.RgbOutput
 
@@ -12,7 +13,7 @@ sealed class StatusEntry {
 data class Announce(val authorized: Boolean, val type: Int, val fw: Int, val name: String)
 data class RelayDevice(val id: ByteArray, val type: Int, val online: Boolean)
 
-/** Payload builders and parsers for ESPCTL v1. Parsers never throw; they return null on malformed input. */
+/** ESPCTL payload builders and defensive parsers. */
 object Payloads {
     private fun u8(v: Int) = v.toByte()
 
@@ -38,17 +39,18 @@ object Payloads {
         if (p.size < 4) return null
         val nameLen = p[3].toInt() and 0xFF
         if (p.size < 4 + nameLen) return null
-        return Announce(
-            authorized = p[0].toInt() != 0,
-            type = p[1].toInt() and 0xFF,
-            fw = p[2].toInt() and 0xFF,
-            name = String(p, 4, nameLen, Charsets.UTF_8),
-        )
+        return Announce(p[0].toInt() != 0, p[1].toInt() and 0xFF, p[2].toInt() and 0xFF,
+            String(p, 4, nameLen, Charsets.UTF_8))
     }
 
+    /**
+     * CAPS v1 base payload is unchanged. Optional tail:
+     * effectCount:u8, repeated (effectId:u8, nameLength:u8, UTF-8 name).
+     * Old firmware without the tail remains compatible.
+     */
     fun parseCaps(p: ByteArray): Capabilities? {
         var i = 0
-        fun has(n: Int) = i + n <= p.size
+        fun has(n: Int) = n >= 0 && i + n <= p.size
         if (!has(3)) return null
         val type = p[i++].toInt() and 0xFF
         val fw = p[i++].toInt() and 0xFF
@@ -62,8 +64,21 @@ object Payloads {
         val nOn = p[i++].toInt() and 0xFF
         if (!has(nOn)) return null
         val on = ArrayList<OnOffOutput>()
-        repeat(nOn) { on.add(OnOffOutput(p[i].toInt() and 0xFF)); i++ }
-        return Capabilities(name, type, fw, rgb, on)
+        repeat(nOn) { on.add(OnOffOutput(p[i++].toInt() and 0xFF)) }
+        val effects = ArrayList<EffectCapability>()
+        if (i < p.size) {
+            val nEffects = p[i++].toInt() and 0xFF
+            repeat(nEffects) {
+                if (!has(2)) return null
+                val id = p[i++].toInt() and 0xFF
+                val len = p[i++].toInt() and 0xFF
+                if (!has(len)) return null
+                val effectName = String(p, i, len, Charsets.UTF_8); i += len
+                if (effectName.isNotBlank()) effects.add(EffectCapability(id, effectName))
+            }
+            if (i != p.size) return null
+        }
+        return Capabilities(name, type, fw, rgb, on, effects)
     }
 
     fun parseStatus(p: ByteArray): List<StatusEntry>? {
@@ -88,10 +103,11 @@ object Payloads {
                 if (mask and 4 != 0) { if (i + 1 > p.size) return null; br = p[i++].toInt() and 0xFF }
                 if (mask and 8 != 0) { if (i + 1 > p.size) return null; fx = p[i++].toInt() != 0 }
                 out.add(StatusEntry.Rgb(id, on, r, g, b, br, fx))
-            } else {
+            } else if (kind == 1) {
                 if (mask and 1 != 0) { if (i + 1 > p.size) return null; out.add(StatusEntry.OnOff(id, p[i++].toInt() != 0)) }
-            }
+            } else return null
         }
+        if (i != p.size) return null
         return out
     }
 
