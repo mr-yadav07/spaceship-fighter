@@ -209,8 +209,8 @@ class DeviceHub(ctx: Context, private val keys: OwnerKeyStore, private val store
         }
     }
 
-    /** Local UDP > BLE > relay, among routes that are currently alive. */
-    private fun best(l: Link): RouteKind? = RouteKind.values().firstOrNull { alive(l, it) }
+    /** BLE is the active transport in this release; UDP and relay remain visible but dormant. */
+    private fun best(l: Link): RouteKind? = listOf(RouteKind.BLE).firstOrNull { alive(l, it) }
 
     private suspend fun transmit(l: Link, route: RouteKind, bytes: ByteArray): Boolean {
         val ep = l.routes[route]?.endpoint
