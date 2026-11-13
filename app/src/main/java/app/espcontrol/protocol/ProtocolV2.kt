@@ -56,8 +56,8 @@ object ProtocolV2 {
         repeat(count) {
             val kind=u(); val id=u()
             require(ids.add(kind to id))
-            if (kind == SWITCH) { switches += OnOffOutput(id); str() }
-            else if (kind == RGB) { require(i+2<=p.size); val leds=u() or (u() shl 8); require(leds>0); rgb += RgbOutput(id,leds); str() }
+            if (kind == SWITCH) { switches += OnOffOutput(id, str()) }
+            else if (kind == RGB) { require(i+2<=p.size); val leds=u() or (u() shl 8); require(leds>0); rgb += RgbOutput(id,leds,str()) }
             else error("Unknown candidate kind")
         }
         val effectCount=u()
