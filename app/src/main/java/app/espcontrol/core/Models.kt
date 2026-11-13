@@ -7,6 +7,7 @@ enum class LinkState { OFFLINE, CONNECTING, ONLINE, UNAUTHORIZED }
 
 data class RgbOutput(val id: Int, val leds: Int)
 data class OnOffOutput(val id: Int)
+data class EffectCapability(val id: Int, val name: String)
 
 data class Capabilities(
     val name: String,
@@ -14,6 +15,7 @@ data class Capabilities(
     val fw: Int,
     val rgb: List<RgbOutput>,
     val onoff: List<OnOffOutput>,
+    val effects: List<EffectCapability> = emptyList(),
 )
 
 data class RgbState(
