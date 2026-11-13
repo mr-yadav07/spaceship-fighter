@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <vector>
+#include <mutex>
 
 static constexpr char SERVICE_UUID[] = "a6c60001-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr char COMMAND_UUID[] = "a6c60002-6b9f-4d8e-a251-5bd248e8c101";
@@ -34,6 +35,9 @@ static const Effect EFFECTS[] = {
 static NimBLECharacteristic* eventChar=nullptr;
 static std::vector<uint8_t> pending;
 static uint32_t feedbackDue=0;
+struct PendingCommand { uint8_t kind,id,a,b,c,brightness,on; };
+static std::vector<PendingCommand> commandQueue;
+static std::mutex commandMutex;
 
 // Return true only after the requested value has actually been applied.
 // Replace these stubs with non-blocking GPIO/LED driver operations.
@@ -160,6 +164,27 @@ static bool validateCommand(uint8_t type,const uint8_t* p,size_t len) {
   }
   return i==len;
 }
+static void enqueueCommand(const PendingCommand& cmd) {
+  std::lock_guard<std::mutex> guard(commandMutex);
+  for(auto &queued:commandQueue) {
+    if(queued.kind==cmd.kind && queued.id==cmd.id) { queued=cmd; return; }
+  }
+  commandQueue.push_back(cmd);
+}
+static void processPendingCommands() {
+  PendingCommand cmd{};
+  {
+    std::lock_guard<std::mutex> guard(commandMutex);
+    if(commandQueue.empty()) return;
+    cmd=commandQueue.front();
+    commandQueue.erase(commandQueue.begin());
+  }
+  bool applied=false;
+  if(cmd.kind==SWITCH_KIND) applied=applySwitch(cmd.id,cmd.a!=0);
+  else if(cmd.kind==RGB_KIND) applied=applyRgb(cmd.id,cmd.a,cmd.b,cmd.c,cmd.brightness,cmd.on!=0);
+  else if(cmd.kind==EFFECT_KIND) applied=applyEffect(cmd.id,cmd.a,cmd.b);
+  if(applied) queueActual(cmd.kind,cmd.id);
+}
 static void handleCommand(const uint8_t* d,size_t n) {
   if(n<6 || d[0]!=MAGIC0 || d[1]!=MAGIC1 || d[2]!=VERSION) return;
   uint8_t type=d[3]; uint16_t len=rd16(d+4);
@@ -170,39 +195,15 @@ static void handleCommand(const uint8_t* d,size_t n) {
   if(!validateCommand(type,p,len)) return;
   uint8_t count=p[0]; size_t i=1;
   for(uint8_t x=0;x<count;x++) {
-    uint8_t id=p[i++];
-    bool applied=false; uint8_t kind=0;
+    PendingCommand cmd{};
+    cmd.id=p[i++];
     if(type==SWITCH_SET) {
-      bool on=p[i++]!=0; applied=applySwitch(id,on); kind=SWITCH_KIND;
+      cmd.kind=SWITCH_KIND; cmd.a=p[i++];
     } else if(type==RGB_SET) {
-      uint8_t r=p[i++],g=p[i++],b=p[i++],br=p[i++]; bool on=p[i++]!=0;
-      applied=applyRgb(id,r,g,b,br,on); kind=RGB_KIND;
+      cmd.kind=RGB_KIND; cmd.a=p[i++]; cmd.b=p[i++]; cmd.c=p[i++];
+      cmd.brightness=p[i++]; cmd.on=p[i++];
     } else {
-      uint8_t effect=p[i++],speed=p[i++]; applied=applyEffect(id,effect,speed); kind=EFFECT_KIND;
+      cmd.kind=EFFECT_KIND; cmd.a=p[i++]; cmd.b=p[i++];
     }
-    if(applied) queueActual(kind,id);
+    enqueueCommand(cmd);
   }
-}
-class CommandCallbacks: public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* c,NimBLEConnInfo&) override {
-    auto v=c->getValue();
-    handleCommand(reinterpret_cast<const uint8_t*>(v.data()),v.size());
-  }
-};
-void setup() {
-  Serial.begin(115200);
-  char devName[18];
-  snprintf(devName,sizeof(devName),"ESPC-%012llX",(unsigned long long)(ESP.getEfuseMac()&0xFFFFFFFFFFFFULL));
-  NimBLEDevice::init(std::string(devName));
-  NimBLEDevice::setMTU(517);
-  NimBLEServer* server=NimBLEDevice::createServer();
-  NimBLEService* service=server->createService(SERVICE_UUID);
-  NimBLECharacteristic* cmd=service->createCharacteristic(COMMAND_UUID,NIMBLE_PROPERTY::WRITE|NIMBLE_PROPERTY::WRITE_NR);
-  eventChar=service->createCharacteristic(EVENTS_UUID,NIMBLE_PROPERTY::NOTIFY);
-  cmd->setCallbacks(new CommandCallbacks());
-  service->start();
-  NimBLEAdvertising* adv=NimBLEDevice::getAdvertising();
-  adv->addServiceUUID(SERVICE_UUID);
-  adv->start();
-}
-void loop() { flushFeedback(); delay(1); }
