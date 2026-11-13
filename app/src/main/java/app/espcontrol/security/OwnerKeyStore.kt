@@ -4,7 +4,6 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import app.espcontrol.protocol.Crypto
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -17,7 +16,6 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class OwnerKeyStore(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("owner_key", Context.MODE_PRIVATE)
-    @Volatile private var cachedAuth: ByteArray? = null
 
     fun get(): String {
         val blob = prefs.getString(PREF, null) ?: return DEFAULT.also { set(it) }
@@ -27,12 +25,6 @@ class OwnerKeyStore(ctx: Context) {
     fun set(ownerKey: String) {
         val value = ownerKey.ifBlank { DEFAULT }
         prefs.edit().putString(PREF, encrypt(value)).apply()
-        cachedAuth = null
-    }
-
-    fun authKey(): ByteArray {
-        cachedAuth?.let { return it }
-        return Crypto.authKey(get()).also { cachedAuth = it }
     }
 
     private fun secretKey(): SecretKey {
