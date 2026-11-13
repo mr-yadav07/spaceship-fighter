@@ -65,7 +65,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
                             l.state=LinkState.ONLINE
                             send(l,ProtocolV2.CAPS_REQUEST)
                             send(l,ProtocolV2.STATUS_REQUEST)
-                        } else if(l.address !in ready && l.state==LinkState.ONLINE) l.state=LinkState.OFFLINE
+                        } else if(l.address !in ready && l.state==LinkState.ONLINE) { l.state=LinkState.OFFLINE; l.caps=null; l.rgb.clear(); l.switches.clear(); l.lastError=null }
                     }
                     publish()
                 }
