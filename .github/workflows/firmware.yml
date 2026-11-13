@@ -1,0 +1,23 @@
+name: ESP32 Firmware
+on:
+  push:
+    paths:
+      - "firmware/esp32-universal-ble/**"
+      - ".github/workflows/firmware.yml"
+  pull_request:
+    paths:
+      - "firmware/esp32-universal-ble/**"
+      - ".github/workflows/firmware.yml"
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - uses: platformio/action@v1
+        with:
+          command: run
+          directory: firmware/esp32-universal-ble
