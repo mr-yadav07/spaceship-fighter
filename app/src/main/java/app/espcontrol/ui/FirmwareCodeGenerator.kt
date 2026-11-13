@@ -13,7 +13,7 @@ object FirmwareCodeGenerator {
         val valid = candidates.isNotEmpty() && candidates.all {
             val id=it.id.toIntOrNull(); val pin=it.gpio.toIntOrNull()
             id!=null && id in 0..255 && pin!=null && pin in 0..48 &&
-                (it.type=="SWITCH" || (it.type=="RGB" && it.leds.toIntOrNull() in 1..65535))
+                (it.type=="SWITCH" || (it.type=="RGB" && it.leds.toIntOrNull()?.let { n -> n in 1..65535 } == true))
         } && candidates.map { it.type to it.id }.distinct().size==candidates.size
         require(valid) { "Candidate IDs, GPIO pins or LED counts are invalid or duplicated." }
         val safeName=deviceName.replace("\\","").replace("\"","").take(32).ifBlank { "ESP32" }
@@ -106,7 +106,7 @@ static void runEffects(){
  if(s.effect==1){for(uint16_t j=0;j<CANDIDATES[i].leds;j++)strip.setPixelColor(j,strip.ColorHSV((uint16_t)(millis()*s.speed+j*65535/CANDIDATES[i].leds)));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==2){uint8_t v=(sin(millis()/500.0)+1)*127;strip.fill(strip.Color(s.r*v/255,s.g*v/255,s.b*v/255));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==3){strip.fill(strip.Color((millis()/8)%255,(millis()/8+85)%255,(millis()/8+170)%255));strip.setBrightness(s.brightness);strip.show();}
- else if(s.effect==4){strip.clear();strip.setPixelColor((millis()/max<uint8_t>(1,255-s.speed))%CANDIDATES[i].leds,strip.Color(s.r,s.g,s.b));strip.setBrightness(s.brightness);strip.show();}
+ else if(s.effect==4){strip.clear();strip.setPixelColor((millis()/max(1,(int)(255-s.speed)))%CANDIDATES[i].leds,strip.Color(s.r,s.g,s.b));strip.setBrightness(s.brightness);strip.show();}
  }
 }
 static void flushFeedback(){if(pending.empty()||(int32_t)(millis()-feedbackDue)<0)return;std::vector<uint8_t>p={0};size_t i=0;while(i<pending.size()){uint8_t k=pending[i];size_t n=k==SWITCH_KIND?3:(k==RGB_KIND?7:4);if(i+n>pending.size()||p.size()+n>508)break;p.insert(p.end(),pending.begin()+i,pending.begin()+i+n);i+=n;p[0]++;}if(p[0])sendFrame(UPDATE,p);pending.erase(pending.begin(),pending.begin()+i);if(!pending.empty())feedbackDue=millis()+10;}
