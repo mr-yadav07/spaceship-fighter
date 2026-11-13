@@ -148,12 +148,12 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         lock.withLock {
             val l=links[id.lowercase()] ?: return@withLock
             if(l.state==LinkState.ONLINE || l.state==LinkState.CONNECTING) return@withLock
-            l.state=LinkState.CONNECTING; l.lastError=null; publish()
+            l.state=LinkState.CONNECTING; l.caps=null; l.rgb.clear(); l.switches.clear(); l.lastError=null; publish()
             ble.connect(l.address)
         }
     } }
     fun disconnect(id:String) { scope.launch {
-        lock.withLock { links[id.lowercase()]?.let { it.state=LinkState.OFFLINE; ble.disconnect(it.address); publish() } }
+        lock.withLock { links[id.lowercase()]?.let { it.state=LinkState.OFFLINE; it.caps=null; it.rgb.clear(); it.switches.clear(); ble.disconnect(it.address); publish() } }
     } }
     fun forget(id:String) { scope.launch {
         lock.withLock { links.remove(id.lowercase())?.let { ble.disconnect(it.address) }; persist(); publish() }
