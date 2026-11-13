@@ -396,7 +396,7 @@ private fun SecuritySheet(vm: ControlViewModel, onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             T("Owner Key", 17f, weight = FontWeight.SemiBold)
-            T("Identifies this app to your devices. Changing it re-authorizes every device.", 12.5f, C.Muted)
+            T("Legacy local setting. BLE Protocol v2 does not transmit or use an Owner Key.", 12.5f, C.Muted)
             androidx.compose.foundation.text.BasicTextField(
                 value = key, onValueChange = { key = it },
                 textStyle = androidx.compose.ui.text.TextStyle(color = C.Text, fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp)),
