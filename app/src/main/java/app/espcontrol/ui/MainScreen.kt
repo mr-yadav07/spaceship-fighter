@@ -538,7 +538,7 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
 private fun CandidateEditor(candidate: FirmwareCandidate,onChange:(FirmwareCandidate)->Unit,onRemove:()->Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0x121FFFFFF))
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0x12FFFFFF))
             .border(1.dp,C.Line,RoundedCornerShape(14.dp)).padding(9.dp),
         verticalArrangement=Arrangement.spacedBy(6.dp),
     ) {
