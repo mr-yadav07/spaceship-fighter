@@ -62,7 +62,7 @@ static bool hasEffect(uint8_t id){if(!id)return true;for(auto&e:EFFECTS)if(e.id=
 static uint16_t rd16(const uint8_t*p){return uint16_t(p[0])|(uint16_t(p[1])<<8);}
 static void sendFrame(uint8_t type,const std::vector<uint8_t>&p){if(!eventChar||p.size()>508)return;std::vector<uint8_t>f={MAGIC0,MAGIC1,VERSION,type,uint8_t(p.size()),uint8_t(p.size()>>8)};f.insert(f.end(),p.begin(),p.end());eventChar->setValue(f.data(),f.size());eventChar->notify();}
 static void queueState(uint8_t kind,uint8_t id){
- int ix=indexOf(kind,id);if(ix<0)return;
+ int ix=indexOf(kind==EFFECT_KIND?RGB_KIND:kind,id);if(ix<0)return;
  size_t pos=0;while(pos<pending.size()){uint8_t k=pending[pos];size_t n=k==SWITCH_KIND?3:(k==RGB_KIND?7:4);if(pos+n>pending.size()){pending.clear();break;}if(k==kind&&pending[pos+1]==id){pending.erase(pending.begin()+pos,pending.begin()+pos+n);break;}pos+=n;}
  State&s=states[ix];std::vector<uint8_t>e={kind,id};
  if(kind==SWITCH_KIND)e.push_back(s.switchOn?1:0);
