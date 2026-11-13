@@ -58,11 +58,11 @@ private class Slot(val i: Int, val vis: Boolean, val scale: Float, val op: Float
 // Geometry of the oval ("egg") revolver in design dp (390 x 844). Same numbers as the Main v2 mockup.
 private const val R = 92f
 private const val B = 260f
-private const val STEP = 0.185f
+private const val STEP = 0.22f
 private const val CY = 407f
 private const val W = 142f
 private const val H = 40f
-private const val PL = 140f
+private const val PL = 0f
 private const val PT = 122f
 private const val PH = 570f
 private const val SPACING = B * STEP
@@ -148,7 +148,7 @@ fun Revolver(
     }
 
     Box(
-        Modifier.offset(PL.dp, PT.dp).size((390f - PL).dp, PH.dp)
+        Modifier.offset(PL.dp, PT.dp).size(390.dp, PH.dp)
             .clip(HalfEllipse).background(Color(0x8C12141C)).border(1.dp, C.Line, HalfEllipse)
             .pointerInput(Unit) {
                 val slop = viewConfiguration.touchSlop
