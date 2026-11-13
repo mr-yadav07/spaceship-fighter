@@ -207,6 +207,36 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         msg("Synced ${sel.size} switches to ${center.label} (${if (center.on) "ON" else "OFF"})")
     }
 
+    /** Trigger an effect by its advertised name. Each selected device resolves that name
+     * to its own local effect ID; unsupported devices are deliberately skipped. */
+    fun triggerEffectByName(effectName: String) {
+        val s = ui.value
+        val targets = selected(true)
+        if (targets.isEmpty()) { msg("Effects: select at least one RGB candidate"); return }
+        if (s.demo) { msg("Effects are unavailable in Demo mode"); return }
+        var applied = 0
+        targets.groupBy { it.devId }.forEach { (deviceId, outputs) ->
+            val device = s.devices.firstOrNull { it.id == deviceId } ?: return@forEach
+            val effect = device.caps?.effects?.firstOrNull { it.name.equals(effectName, ignoreCase = true) }
+                ?: return@forEach
+            outputs.forEach { hub.triggerEffect(deviceId, it.out, effect.id, true); applied++ }
+        }
+        msg(if (applied > 0) "Effect $effectName requested on $applied RGB outputs" else "No selected device supports $effectName")
+    }
+
+    fun stopEffects() {
+        val s = ui.value
+        selected(true).groupBy { it.devId }.forEach { (deviceId, outputs) ->
+            val device = s.devices.firstOrNull { it.id == deviceId } ?: return@forEach
+            val effects = device.caps?.effects.orEmpty()
+            outputs.forEach { out ->
+                val active = effects.firstOrNull()
+                if (active != null) hub.triggerEffect(deviceId, out.out, active.id, false)
+            }
+        }
+        msg("Stop effect requested")
+    }
+
     // ---------------------------------------------------------------- devices / security / settings
 
     fun connect(id: String) = hub.connect(id)
