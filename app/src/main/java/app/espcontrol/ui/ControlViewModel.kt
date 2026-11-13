@@ -97,11 +97,11 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
                 val caps = d.caps ?: continue
                 for (o in caps.rgb) {
                     val st = d.rgbStates[o.id]
-                    val label = if (caps.rgb.size > 1) "${d.name} ${o.id + 1}" else d.name
+                    val label = o.name.ifBlank { if (caps.rgb.size > 1) "${d.name} ${o.id + 1}" else d.name }
                     rgb.add(OutItem("${d.id}#r${o.id}", d.id, o.id, label, st?.on ?: false, Color(st?.r ?: 90, st?.g ?: 90, st?.b ?: 90), true))
                 }
                 for (o in caps.onoff) {
-                    val label = if (caps.onoff.size > 1) "${d.name} ${o.id + 1}" else d.name
+                    val label = o.name.ifBlank { if (caps.onoff.size > 1) "${d.name} ${o.id + 1}" else d.name }
                     sw.add(OutItem("${d.id}#s${o.id}", d.id, o.id, label, d.onOffStates[o.id] ?: false, Color.White, false))
                 }
             }
