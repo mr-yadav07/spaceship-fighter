@@ -482,13 +482,22 @@ private fun EffectsSheet(s: UiState, vm: ControlViewModel, onClose: () -> Unit) 
 @Composable
 private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-    var rgb1 by remember { mutableStateOf("16") }
-    var rgb2 by remember { mutableStateOf("17") }
-    var sw1 by remember { mutableStateOf("18") }
-    var sw2 by remember { mutableStateOf("19") }
-    var low1 by remember { mutableStateOf(false) }
-    var low2 by remember { mutableStateOf(false) }
-    val config = "RGB1_DATA_PIN=${rgb1}\nRGB2_DATA_PIN=${rgb2}\nRGB_LED_COUNT=64\nSWITCH1_PIN=${sw1}\nSWITCH1_ACTIVE_LOW=${low1}\nSWITCH2_PIN=${sw2}\nSWITCH2_ACTIVE_LOW=${low2}"
+    var rgbIds by remember { mutableStateOf("1,2") }
+    var ledCounts by remember { mutableStateOf("64,64") }
+    var switchIds by remember { mutableStateOf("1,2,7") }
+    var deviceName by remember { mutableStateOf("ESP32") }
+    val parsedRgb = rgbIds.split(",").mapNotNull { it.trim().toIntOrNull()?.takeIf { id -> id in 0..255 } }
+    val parsedLeds = ledCounts.split(",").mapNotNull { it.trim().toIntOrNull()?.takeIf { n -> n in 1..65535 } }
+    val parsedSwitches = switchIds.split(",").mapNotNull { it.trim().toIntOrNull()?.takeIf { id -> id in 0..255 } }
+    val valid = parsedRgb.size == parsedLeds.size && parsedRgb.size == parsedRgb.distinct().size &&
+        parsedSwitches.size == parsedSwitches.distinct().size && (parsedRgb + parsedSwitches).all { it in 0..255 }
+    val entries = buildList {
+        parsedSwitches.forEach { add("  {SWITCH_KIND, $it, 0, \"Switch $it\"}") }
+        parsedRgb.forEachIndexed { index, id -> add("  {RGB_KIND, $id, ${parsedLeds.getOrElse(index) { 0 }}, \"RGB $id\"}") }
+    }
+    val safeName = deviceName.replace("\\", "").replace("\"", "")
+    val config = if (!valid || entries.isEmpty()) "Check candidate IDs and LED counts. Use matching RGB ID/count lists." else
+        "static const char DEVICE_NAME[] = \"$safeName\";\nstatic const Candidate CANDIDATES[] = {\n${entries.joinToString(",\n")}\n};"
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier.offset(34.dp, 82.dp).width(330.dp).height(660.dp)
@@ -497,22 +506,14 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             T("Firmware / GPIO setup", 17f, weight = FontWeight.SemiBold)
-            T("Configure two addressable RGB outputs (64 LEDs each) and two independent switch outputs. These are hardware settings, not app command IDs.", 11.5f, C.Muted)
-            ConfigInput("RGB 1 data GPIO", rgb1) { rgb1 = it }
-            ConfigInput("RGB 2 data GPIO", rgb2) { rgb2 = it }
-            ConfigInput("Switch 1 GPIO", sw1) { sw1 = it }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                T("Switch 1 active LOW", 12f)
-                androidx.compose.material3.Switch(checked = low1, onCheckedChange = { low1 = it })
-            }
-            ConfigInput("Switch 2 GPIO", sw2) { sw2 = it }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                T("Switch 2 active LOW", 12f)
-                androidx.compose.material3.Switch(checked = low2, onCheckedChange = { low2 = it })
-            }
+            T("Configure any number of logical candidates. IDs are local to this ESP32; GPIO mapping stays in firmware hardware hooks.", 11.5f, C.Muted)
+            ConfigInput("RGB candidate IDs (comma separated)", rgbIds) { rgbIds = it }
+            ConfigInput("LED counts in matching order", ledCounts) { ledCounts = it }
+            ConfigInput("Switch candidate IDs (comma separated)", switchIds) { switchIds = it }
+            ConfigInput("Device display name", deviceName) { deviceName = it }
             T("Generated configuration", 12f, C.Orange, FontWeight.SemiBold)
             T(config, 11f, C.Text)
-            PillButton("Copy GPIO configuration", 190.dp, {
+            PillButton("Copy candidate configuration", 210.dp, {
                 clipboard.setText(androidx.compose.ui.text.AnnotatedString(config))
             }, primary = true)
             T("Firmware uses BLE Protocol v2. Candidate IDs, LED counts and effect catalogue are configured in the firmware descriptor array; GPIO mapping and hardware callbacks are implemented there. This panel only generates a configuration snippet.", 11f, C.Warn)
