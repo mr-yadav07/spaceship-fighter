@@ -15,7 +15,7 @@ static constexpr char COMMAND_UUID[] = "a6c60002-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr char EVENTS_UUID[]  = "a6c60003-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr uint8_t MAGIC0=0xEC, MAGIC1=0x53, VERSION=2;
 enum : uint8_t { CAPS_REQUEST=0x01, CAPS=0x02, SWITCH_SET=0x10, RGB_SET=0x11,
-                 EFFECT_SET=0x12, UPDATE=0x20, STATUS_REQUEST=0x21, STATUS=0x22 };
+                 EFFECT_SET=0x12, UPDATE=0x20, STATUS_REQUEST=0x21, STATUS_MSG=0x22 };
 enum : uint8_t { SWITCH_KIND=1, RGB_KIND=2, EFFECT_KIND=3 };
 
 struct Candidate { uint8_t kind, id; uint16_t leds; const char* name; };
@@ -145,7 +145,7 @@ static void sendStatus() {
   for(const auto &c:CANDIDATES) if(c.kind==RGB_KIND) {
     appendActual(p,EFFECT_KIND,c.id); p[0]++;
   }
-  sendFrame(STATUS,p);
+  sendFrame(STATUS_MSG,p);
 }
 static bool validateCommand(uint8_t type,const uint8_t* p,size_t len) {
   if(len<1) return false;
@@ -206,4 +206,28 @@ static void handleCommand(const uint8_t* d,size_t n) {
       cmd.kind=EFFECT_KIND; cmd.a=p[i++]; cmd.b=p[i++];
     }
     enqueueCommand(cmd);
+  
+}
+class CommandCallbacks: public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* c,NimBLEConnInfo&) override {
+    auto v=c->getValue();
+    handleCommand(reinterpret_cast<const uint8_t*>(v.data()),v.size());
   }
+};
+void setup() {
+  Serial.begin(115200);
+  char devName[18];
+  snprintf(devName,sizeof(devName),"ESPC-%012llX",(unsigned long long)(ESP.getEfuseMac()&0xFFFFFFFFFFFFULL));
+  NimBLEDevice::init(std::string(devName));
+  NimBLEDevice::setMTU(517);
+  NimBLEServer* server=NimBLEDevice::createServer();
+  NimBLEService* service=server->createService(SERVICE_UUID);
+  NimBLECharacteristic* cmd=service->createCharacteristic(COMMAND_UUID,NIMBLE_PROPERTY::WRITE|NIMBLE_PROPERTY::WRITE_NR);
+  eventChar=service->createCharacteristic(EVENTS_UUID,NIMBLE_PROPERTY::NOTIFY);
+  cmd->setCallbacks(new CommandCallbacks());
+  service->start();
+  NimBLEAdvertising* adv=NimBLEDevice::getAdvertising();
+  adv->addServiceUUID(SERVICE_UUID);
+  adv->start();
+}
+void loop() { processPendingCommands(); flushFeedback(); delay(1); }
