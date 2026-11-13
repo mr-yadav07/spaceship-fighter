@@ -1,28 +1,28 @@
 # ESP Control Studio
 
-Native Android application for discovering and controlling ESP devices over Bluetooth Low Energy (BLE), local Wi-Fi UDP, and an optional UDP relay.
+Native Android app for discovering and controlling ESP32 devices over Bluetooth Low Energy (BLE).
 
-## Build APK
+## Build Android APK
+Every push to `main` starts the **Android APK** GitHub Actions workflow.
 
-The complete Android project source is stored directly in this repository. Every push to `main` starts the Android build workflow.
+1. Open the repository's **Actions** tab.
+2. Open the latest successful **Android APK** run.
+3. Download the `ESPControlStudio-debug-apk` artifact.
 
-1. Open the **Actions** tab.
-2. Select the **Android APK** workflow run.
-3. Download the `ESPControlStudio-debug-apk` artifact after the run succeeds.
+## BLE configuration
+Open **Settings → Connection config**. The active settings are:
+- GATT service UUID
+- Command characteristic UUID
+- Events characteristic UUID
+- Advertised device-name prefix (default `ESPC-`)
 
-## App configuration
+These settings are stored locally and can be changed without rebuilding the APK.
 
-Open **Settings → Connection config** in the app.
+## Protocol and firmware
+- Android/firmware contract: [docs/ESPControl-BLE-Protocol-v2.md](docs/ESPControl-BLE-Protocol-v2.md)
+- Universal ESP32 firmware: [firmware/esp32-universal-ble](firmware/esp32-universal-ble)
+- Firmware build: PlatformIO; GitHub Actions runs the ESP32 Firmware workflow.
 
-- BLE service, command, and event UUIDs must match the GATT service implemented by the ESP firmware.
-- The BLE advertised-name prefix must match the firmware's device name.
-- Local UDP ports must match the firmware protocol settings.
-- Relay hostname and UDP port are optional. Leave the hostname blank to disable relay.
+The app discovers each device's switch/RGB candidates and effect catalogue from CAPS. Candidate IDs are local to each connected ESP32. GPIO mapping, LED layout and hardware callbacks belong to the firmware.
 
-Open **Settings → Security (Owner Key)** to configure the Owner Key. It must match the key configured on the ESP devices.
-
-Connection settings are stored locally on the phone. Changing these settings does not require rebuilding the APK.
-
-## Scope
-
-This repository contains the Android client only. It does not include ESP firmware or a relay server. The app and firmware must implement the same ESPCTL packet format and compatible authentication handshake.
+Protocol v2 is BLE-only. The old ESPCTL handshake, application-layer encryption, UDP discovery and relay routing have been removed. BLE link security is separate and is not enabled by this protocol implementation.
