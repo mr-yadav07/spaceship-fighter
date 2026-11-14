@@ -318,7 +318,6 @@ private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openShee
 @Composable
 private fun UiStyleSheet(selected: Int, onSelect: (Int) -> Unit, onClose: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color(0x8C0A0B10)).clickable(onClick = onClose))
         Column(
             Modifier.offset(56.dp, 236.dp).width(286.dp)
                 .clip(RoundedCornerShape(24.dp)).background(Color(0xE612141C))
