@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -178,7 +179,7 @@ fun HSlider(
         }
         if (showBadge) {
             Box(
-                Modifier.offset(x = maxWidth * frac - 16.dp, y = 0.dp).clip(RoundedCornerShape(8.dp)).background(C.Track),
+                Modifier.offset(x = maxWidth * frac, y = 0.dp).graphicsLayer { translationX = -size.width / 2f }.clip(RoundedCornerShape(8.dp)).background(C.Track),
             ) { T("$value", 11f, weight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp)) }
         }
     }
