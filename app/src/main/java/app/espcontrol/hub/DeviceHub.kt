@@ -136,9 +136,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
 
     private suspend fun send(l:Link,type:Int,payload:ByteArray=byteArrayOf()):Boolean {
         if(!ble.isReady(l.address)) return false
-        val ok=ble.send(l.address,ProtocolV2.encode(type,payload))
-        if(!ok) l.lastError="BLE write failed"
-        return ok
+        return ble.send(l.address,ProtocolV2.encode(type,payload))
     }
 
     /** One serialized writer per device. Pending keys are latest-value-wins. */
@@ -161,10 +159,12 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
                 }
                 if(batch.isEmpty()) break
                 for((_,packet) in batch) {
-                    lock.withLock {
-                        if(l.state==LinkState.ONLINE) {
-                            val ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
-                            if(!ok) l.lastError="BLE write failed · latest update will retry on next change"
+                    val online=lock.withLock { l.state==LinkState.ONLINE }
+                    if(online) {
+                        val ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
+                        lock.withLock {
+                            if(!ok) l.lastError="BLE write failed · reconnect or change the target to retry"
+                            else l.lastError=null
                             publish()
                         }
                     }
