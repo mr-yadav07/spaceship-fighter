@@ -138,16 +138,16 @@ fun Revolver(
     }
 
     fun stepBy(delta: Float) {
-        motion?.cancel()
-        motion = scope.launch {
+        controller.motion?.cancel()
+        controller.motion = motionScope.launch {
             val target = (rot + delta).let { if (curFinite) it.coerceIn(0f, (curN - 1).coerceAtLeast(0).toFloat()) else it }
             animate(initialValue = rot, targetValue = target, animationSpec = tween(260)) { v, _ -> rot = v }
         }
     }
 
     fun fling(v0: Float, sensF: Float) {
-        motion?.cancel()
-        motion = scope.launch {
+        controller.motion?.cancel()
+        controller.motion = motionScope.launch {
             var vel = v0
             val tau = 300f + sensF * 1100f
             var last = withFrameNanos { it }
