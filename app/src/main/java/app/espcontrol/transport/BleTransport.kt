@@ -36,8 +36,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -71,7 +69,6 @@ class BleTransport(private val ctx: Context) : Transport {
         @Volatile var cmd: BluetoothGattCharacteristic? = null
         @Volatile var ready = false
         @Volatile var mtu = 23
-        val writeMutex = Mutex()
     }
 
 
