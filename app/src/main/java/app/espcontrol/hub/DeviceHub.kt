@@ -49,7 +49,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         val id:String, val address:String, var name:String, var state:LinkState=LinkState.OFFLINE,
         var paired:Boolean=false, var caps:Capabilities?=null, val rgb:HashMap<Int,RgbState> = hashMapOf(),
         val switches:HashMap<Int,Boolean> = hashMapOf(), var lastError:String?=null,
-        val pending:HashMap<String,ByteArray> = hashMapOf(), val sendJobs:HashMap<String,Job> = hashMapOf()
+        val pending:HashMap<String,ByteArray> = hashMapOf(), var sendJob:Job? = null
     )
 
     fun start() {
@@ -141,20 +141,33 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         return ok
     }
 
+    /** One serialized writer per device. Pending keys are latest-value-wins. */
     private fun queue(l:Link,key:String,bytes:ByteArray) {
         l.pending[key]=bytes
-        if (l.sendJobs[key]?.isActive == true) return
-        l.sendJobs[key]=scope.launch {
+        if (l.sendJob?.isActive == true) return
+        l.sendJob=scope.launch {
             while (true) {
-                val packet = lock.withLock {
-                    val next=l.pending.remove(key)
-                    if (next == null) l.sendJobs.remove(key)
-                    if (next != null && l.state==LinkState.ONLINE) next else null
-                } ?: break
-                val ok = send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
-                lock.withLock {
-                    if (!ok) l.lastError="BLE write failed"
-                    publish()
+                val batch=lock.withLock {
+                    if(l.state!=LinkState.ONLINE) {
+                        l.pending.clear()
+                        l.sendJob=null
+                        emptyList()
+                    } else if(l.pending.isEmpty()) {
+                        l.sendJob=null
+                        emptyList()
+                    } else {
+                        l.pending.entries.map { it.key to it.value }.also { l.pending.clear() }
+                    }
+                }
+                if(batch.isEmpty()) break
+                for((_,packet) in batch) {
+                    lock.withLock {
+                        if(l.state==LinkState.ONLINE) {
+                            val ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
+                            if(!ok) l.lastError="BLE write failed · latest update will retry on next change"
+                            publish()
+                        }
+                    }
                 }
             }
         }
@@ -178,19 +191,31 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
     fun onPermissionsChanged() { ble.ensureScanning() }
 
     fun setRgb(id:String,out:Int,r:Int,g:Int,b:Int) { setRgbs(id, listOf(ProtocolV2.RgbCommand(out,r.coerceIn(0,255),g.coerceIn(0,255),b.coerceIn(0,255),255,true))) }
-    fun setRgbs(id:String, values:List<ProtocolV2.RgbCommand>) { scope.launch {
+    fun setRgbs(id:String, values:List<ProtocolV2.RgbCommand>) {
+        setRgbGroup(mapOf(id to values))
+    }
+
+    /** Queue one coalesced packet per ESP32; device workers run concurrently. */
+    fun setRgbGroup(group:Map<String,List<ProtocolV2.RgbCommand>>) { scope.launch {
         lock.withLock {
-            val l=links[id.lowercase()] ?: return@withLock
-            val valid=values.filter { v -> l.caps?.rgb?.any { it.id==v.id } == true }
-            if(valid.isEmpty()) return@withLock
-            valid.forEach { v ->
-                val old=l.rgb[v.id] ?: RgbState()
-                l.rgb[v.id]=old.copy(r=v.r,g=v.g,b=v.b,brightness=v.brightness,on=v.on)
+            group.forEach { (deviceId,values) ->
+                val l=links[deviceId.lowercase()] ?: return@forEach
+                if(l.state!=LinkState.ONLINE) return@forEach
+                val valid=values.filter { v -> l.caps?.rgb?.any { it.id==v.id } == true }
+                if(valid.isEmpty()) return@forEach
+                valid.forEach { v ->
+                    val old=l.rgb[v.id] ?: RgbState()
+                    l.rgb[v.id]=old.copy(r=v.r,g=v.g,b=v.b,brightness=v.brightness,on=v.on)
+                }
+                val payload=ProtocolV2.rgbTransitions(valid.map {
+                    ProtocolV2.RgbTransitionCommand(it.id,it.r,it.g,it.b,it.brightness,it.on)
+                })
+                queue(l,"rgb-batch",byteArrayOf(ProtocolV2.RGB_TRANSITION.toByte())+payload)
             }
-            queue(l,"rgb-batch",byteArrayOf(ProtocolV2.RGB_SET.toByte())+ProtocolV2.rgbs(valid))
             publish()
         }
     } }
+
     fun setBrightness(id:String,out:Int,value:Int) { updateRgb(id,out) { it.copy(brightness=value.coerceIn(0,255)) } }
     fun setPower(id:String,out:Int,on:Boolean) { updateRgb(id,out) { it.copy(on=on) } }
     private fun updateRgb(id:String,out:Int,change:(RgbState)->RgbState) { scope.launch {
