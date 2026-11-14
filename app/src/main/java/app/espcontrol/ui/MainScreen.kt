@@ -64,10 +64,14 @@ fun MainScreen(vm: ControlViewModel) {
     val centerSw = centerItem(s.swItems)
 
     Box(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
-            .clip(RoundedCornerShape(0.dp)),
+        Modifier.fillMaxSize().background(C.Bg2),
+        contentAlignment = Alignment.TopCenter,
     ) {
+        Box(
+            Modifier.size(390.dp, 844.dp)
+                .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
+                .clip(RoundedCornerShape(0.dp)),
+        ) {
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
@@ -139,6 +143,7 @@ fun MainScreen(vm: ControlViewModel) {
             onSwitch = { panel = if (panel == Panel.SWITCH) Panel.NONE else Panel.SWITCH },
             onMenu = { panel = if (panel == Panel.MENU) Panel.NONE else Panel.MENU },
         )
+        }
     }
 }
 
