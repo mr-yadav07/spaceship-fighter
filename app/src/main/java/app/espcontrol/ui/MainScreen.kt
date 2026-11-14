@@ -46,7 +46,7 @@ import app.espcontrol.core.LinkState
 import app.espcontrol.core.RouteKind
 
 private enum class Panel { NONE, SETTINGS, SCAN, RGB, SWITCH, MENU }
-private enum class Sheet { NONE, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
+private enum class Sheet { NONE, UI, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
 
 @Composable
 fun MainScreen(vm: ControlViewModel) {
@@ -54,6 +54,7 @@ fun MainScreen(vm: ControlViewModel) {
     var panel by remember { mutableStateOf(Panel.NONE) }
     var sheet by remember { mutableStateOf(Sheet.NONE) }
     var infoOpen by remember { mutableStateOf(false) }
+    var revolverUi by remember { mutableStateOf(1) }
 
     val eff = Triple(s.effR, s.effG, s.effB)
     val anySelOn = s.rgbPowerOn
@@ -112,10 +113,10 @@ fun MainScreen(vm: ControlViewModel) {
 
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(tween(250)), exit = fadeOut(tween(250))) {
             when (panel) {
-                Panel.SETTINGS -> SettingsRevolver(vm, s) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
+                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
-                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, vm::toggleSelect, vm::toggleItemOn)
-                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, vm::toggleSelect, vm::toggleItemOn)
+                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, vm::toggleSelect, vm::toggleItemOn)
+                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, vm::toggleSelect, vm::toggleItemOn)
                 Panel.MENU -> MenuPanel { panel = Panel.NONE }
                 else -> {}
             }
@@ -125,6 +126,7 @@ fun MainScreen(vm: ControlViewModel) {
         }
         AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             when (sheet) {
+                Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
                 Sheet.DEVICES -> DevicesSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
                 Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
@@ -269,26 +271,56 @@ private fun MenuPanel(onClose: () -> Unit) {
 
 @Composable
 private fun ListRevolver(
-    items: List<OutItem>, selected: Set<String>, mode: ScrollMode, sens: Int,
+    items: List<OutItem>, selected: Set<String>, mode: ScrollMode, sens: Int, ui: Int,
     onSelect: (OutItem) -> Unit, onToggle: (OutItem) -> Unit,
 ) {
     Revolver(
         items = items.map { RevItem(it.label, sel = it.key in selected, on = it.on, dot = if (it.isRgb) it.color else null) },
-        mode = mode, sens = sens,
+        mode = mode, sens = sens, ui = ui,
         onName = { i -> items.getOrNull(i)?.let(onSelect) },
         onToggle = { i -> items.getOrNull(i)?.let(onToggle) },
     )
 }
 
 @Composable
-private fun SettingsRevolver(vm: ControlViewModel, s: UiState, openSheet: (Sheet) -> Unit) {
-    val items = listOf("Devices" to Sheet.DEVICES, "Effects catalogue" to Sheet.EFFECTS, "Firmware / GPIO setup" to Sheet.FIRMWARE, "Connection config" to Sheet.CONNECTION, "Security (Owner Key)" to Sheet.SECURITY, "Scroll" to Sheet.SCROLL, "Demo data" to Sheet.NONE)
+private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
+    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.NONE, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.NONE, "Scroll" to Sheet.SCROLL)
     Revolver(
-        items = items.mapIndexed { i, (n, _) -> RevItem(n, sel = false, on = i == 6 && s.demo, dot = null) },
-        mode = s.mode, sens = s.sens[s.mode] ?: 0,
-        onName = { i -> if (items[i].second == Sheet.NONE) vm.setDemo(!s.demo) else openSheet(items[i].second) },
-        onToggle = { i -> if (items[i].second == Sheet.NONE) vm.setDemo(!s.demo) },
+        items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) },
+        mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
+        onName = { i -> items.getOrNull(i)?.second?.let(openSheet) },
+        onToggle = { i -> items.getOrNull(i)?.second?.let(openSheet) },
     )
+}
+
+@Composable
+private fun UiStyleSheet(selected: Int, onSelect: (Int) -> Unit, onClose: () -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(Color(0x8C0A0B10)).clickable(onClick = onClose))
+        Column(
+            Modifier.offset(56.dp, 236.dp).width(286.dp)
+                .clip(RoundedCornerShape(24.dp)).background(Color(0xE612141C))
+                .border(1.dp, C.Line, RoundedCornerShape(24.dp)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            T("Choose revolver style", 12f, C.Muted)
+            listOf(
+                1 to ("UI 1" to "Oval revolver: tall list, more devices at a time"),
+                2 to ("UI 2" to "Hub half-circle revolver: centre is big, edges are small"),
+            ).forEach { (id, entry) ->
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .background(if (selected == id) Color(0xFF1E2740) else Color(0xFF0E0F14))
+                        .border(2.dp, if (selected == id) C.Orange else C.Line, RoundedCornerShape(16.dp))
+                        .clickable { onSelect(id) }.padding(14.dp),
+                ) {
+                    T(entry.first, 15f, weight = FontWeight.SemiBold)
+                    T(entry.second, 12f, C.Muted)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
+        }
+    }
 }
 
 @Composable
