@@ -40,6 +40,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
     private val lock = Mutex()
     private val devicesFlow = MutableStateFlow<List<DeviceInfo>>(emptyList())
     val devices: StateFlow<List<DeviceInfo>> = devicesFlow.asStateFlow()
+    val scanStatus: StateFlow<String> = ble.scanStatus
     private val eventFlow = MutableSharedFlow<String>(extraBufferCapacity=16,onBufferOverflow=BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<String> = eventFlow.asSharedFlow()
     private var started=false
