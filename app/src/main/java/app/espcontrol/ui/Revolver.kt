@@ -51,18 +51,18 @@ import kotlin.math.sin
 data class RevItem(val name: String, val sel: Boolean, val on: Boolean, val dot: Color?)
 
 /** Visible left half of an oval that is twice as wide as the box (the right half is off-screen). */
-private val HalfEllipse = GenericShape { size, _ -> addOval(Rect(0f, 0f, size.width * 2f, size.height)) }
+
 
 private class Slot(val i: Int, val vis: Boolean, val scale: Float, val op: Float, val left: Float, val top: Float)
 
 // Geometry of the oval ("egg") revolver in design dp (390 x 844). Same numbers as the Main v2 mockup.
 private const val R = 92f
 private const val B = 260f
-private const val STEP = 0.22f
+private const val STEP = 0.185f
 private const val CY = 407f
 private const val W = 142f
 private const val H = 40f
-private const val PL = 0f
+private const val PL = 140f
 private const val PT = 122f
 private const val PH = 570f
 private const val SPACING = B * STEP
@@ -70,8 +70,7 @@ private const val SPACING = B * STEP
 private fun slots(n: Int, rot: Float): List<Slot> = (0 until n).map { i ->
     var d = (((i - rot) % n) + n) % n
     if (d > n / 2f) d -= n
-    val step = if (n <= 9) 0.34f else STEP
-    val th = d * step
+    val th = d * STEP
     val c = cos(th)
     val vis = c > 0.3f
     Slot(
@@ -149,8 +148,8 @@ fun Revolver(
     }
 
     Box(
-        Modifier.offset(PL.dp, PT.dp).size(390.dp, PH.dp)
-            .clip(HalfEllipse).background(Color(0x8C12141C)).border(1.dp, C.Line, HalfEllipse)
+        Modifier.offset(PL.dp, PT.dp).size(500.dp, PH.dp)
+            .clip(CircleShape).background(Color(0x8C12141C)).border(1.dp, C.Line, CircleShape)
             .pointerInput(Unit) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
@@ -204,6 +203,7 @@ fun Revolver(
                 }
             },
     ) {
+        Box(Modifier.offset((298f - PL).dp, 25.dp).size(184.dp, 520.dp).border(1.dp, Color(0x24FFFFFF), CircleShape))
         for (s in slots(n, rot)) {
             if (!s.vis) continue
             val item = items.getOrNull(s.i) ?: continue
