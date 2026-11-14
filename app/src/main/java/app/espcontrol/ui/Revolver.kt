@@ -179,7 +179,7 @@ fun Revolver(
         Box(
             Modifier.offset(g.panLeft.dp, g.panTop.dp).size(g.panWidth.dp, g.panHeight.dp)
                 .clip(CircleShape).background(Color(0x8C12141C)).border(1.dp, C.Line, CircleShape)
-                            .pointerInput(Unit) {
+                            .pointerInput(ui, finite) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown()
