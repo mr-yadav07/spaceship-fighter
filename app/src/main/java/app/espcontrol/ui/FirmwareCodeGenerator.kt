@@ -97,7 +97,7 @@ static void applyQueued(){
  while(true){Cmd c{};{std::lock_guard<std::mutex>g(queueMutex);if(queue.empty())return;c=queue.front();queue.erase(queue.begin());}
  uint8_t kind=c.kind;int ix=indexOf(kind,c.id);if(ix<0)return;State&s=states[ix];const Candidate&cfg=CANDIDATES[ix];
  if(kind==SWITCH_KIND){s.switchOn=c.a;digitalWrite(cfg.pin,s.switchOn?HIGH:LOW);}
- else if(kind==RGB_KIND){s.r=c.a;s.g=c.b;s.b=c.c;s.brightness=c.br;s.on=c.on;if(s.strip){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
+ else if(kind==RGB_KIND){s.r=c.a;s.g=c.b;s.b=c.c;s.brightness=c.br;s.on=c.on;s.effect=0;if(s.strip){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
  else{s.effect=c.a;s.speed=c.b;if(s.strip && c.a==0){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
  queueState(kind,c.id);
  }
