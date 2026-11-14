@@ -251,7 +251,7 @@ fun Revolver(
             Row(
                 Modifier.offset(s.left.dp, s.top.dp).size(g.w.dp, g.h.dp)
                     .graphicsLayer { scaleX = s.scale; scaleY = s.scale; alpha = s.op; transformOrigin = TransformOrigin(1f, 0.5f) },
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val shape = RoundedCornerShape(14.dp)
