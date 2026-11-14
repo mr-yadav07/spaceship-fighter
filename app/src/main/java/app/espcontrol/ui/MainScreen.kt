@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -93,7 +94,7 @@ fun MainScreen(vm: ControlViewModel) {
             ) { T(if (anySelOn) "ON" else "OFF", 15f, weight = FontWeight.SemiBold) }
         }
 
-        Column(Modifier.offset(288.dp, 302.dp).width(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.offset(288.dp, (303f + 184f * (1f - s.br / 255f)).dp).width(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.clip(RoundedCornerShape(8.dp)).background(C.Track).padding(horizontal = 6.dp, vertical = 2.dp)) { T("${s.br}", 11f, weight = FontWeight.SemiBold) }
         }
         VSlider(s.br, 255, { vm.setBrightness(it) }, Modifier.offset(323.dp, 312.dp).size(14.dp, 184.dp))
