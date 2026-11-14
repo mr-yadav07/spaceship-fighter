@@ -111,6 +111,13 @@ fun MainScreen(vm: ControlViewModel) {
         ActionRow(18.dp, 676.dp, "RGB", { vm.syncRgb() }, { vm.dselect(true) }, { vm.togglePower() })
         ActionRow(18.dp, 722.dp, "Switches", { vm.syncSwitches(centerSw) }, { vm.dselect(false) }, { vm.powerSwitches() })
 
+        if (panel != Panel.NONE) {
+            Box(
+                Modifier.fillMaxSize().background(Color(0x8C0A0B10))
+                    .clickable { panel = Panel.NONE; sheet = Sheet.NONE },
+            )
+        }
+
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(tween(250)), exit = fadeOut(tween(250))) {
             when (panel) {
                 Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
