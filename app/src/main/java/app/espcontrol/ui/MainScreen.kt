@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,8 +65,8 @@ fun MainScreen(vm: ControlViewModel) {
     var selectedTheme by remember { mutableStateOf("Dark") }
     var switchPowerUp by remember { mutableStateOf("Last") }
     var switchMode by remember { mutableStateOf("Toggle") }
-    val rgbRevolverRotation = remember { mutableFloatStateOf(0f) }
-    val switchRevolverRotation = remember { mutableFloatStateOf(0f) }
+    val revolverController = remember { RevolverController() }
+    val revolverScope = rememberCoroutineScope()
 
     val eff = Triple(s.effR, s.effG, s.effB)
     val anySelOn = s.rgbPowerOn
@@ -137,10 +138,10 @@ fun MainScreen(vm: ControlViewModel) {
 
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(tween(250)), exit = fadeOut(tween(250))) {
             when (panel) {
-                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
+                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi, revolverController, revolverScope) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
-                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, rgbRevolverRotation, vm::toggleSelect, vm::toggleItemOn)
-                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, switchRevolverRotation, vm::toggleSelect, vm::toggleItemOn)
+                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
+                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
                 Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> panel = Panel.NONE; sheet = target })
                 else -> {}
             }
@@ -315,19 +316,19 @@ private fun MenuPanel(onClose: () -> Unit, onOpen: (Sheet) -> Unit) {
 @Composable
 private fun ListRevolver(
     items: List<OutItem>, selected: Set<String>, mode: ScrollMode, sens: Int, ui: Int,
-    rotationState: androidx.compose.runtime.MutableFloatState,
+    controller: RevolverController, motionScope: kotlinx.coroutines.CoroutineScope,
     onSelect: (OutItem) -> Unit, onToggle: (OutItem) -> Unit,
 ) {
     Revolver(
         items = items.map { RevItem(it.label, sel = it.key in selected, on = it.on, dot = if (it.isRgb) it.color else null) },
-        mode = mode, sens = sens, ui = ui, rotationState = rotationState,
+        mode = mode, sens = sens, ui = ui, controller = controller, motionScope = motionScope,
         onName = { i -> items.getOrNull(i)?.let(onSelect) },
         onToggle = { i -> items.getOrNull(i)?.let(onToggle) },
     )
 }
 
 @Composable
-private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
+private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, controller: RevolverController, motionScope: kotlinx.coroutines.CoroutineScope, openSheet: (Sheet) -> Unit) {
     val items = listOf(
         "Devices" to Sheet.DEVICES,
         "Effects catalogue" to Sheet.EFFECTS,
@@ -342,7 +343,7 @@ private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openShee
     Revolver(
         items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) } +
             RevItem("Demo data", sel = false, on = s.demo, dot = null),
-        mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
+        mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true, controller = controller, motionScope = motionScope,
         onName = { i ->
             if (i == items.size) vm.setDemo(!s.demo)
             else items.getOrNull(i)?.second?.let(openSheet)
