@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -60,6 +63,8 @@ fun MainScreen(vm: ControlViewModel) {
     var selectedTheme by remember { mutableStateOf("Dark") }
     var switchPowerUp by remember { mutableStateOf("Last") }
     var switchMode by remember { mutableStateOf("Toggle") }
+    val rgbRevolverRotation = remember { mutableFloatStateOf(0f) }
+    val switchRevolverRotation = remember { mutableFloatStateOf(0f) }
 
     val eff = Triple(s.effR, s.effG, s.effB)
     val anySelOn = s.rgbPowerOn
@@ -69,12 +74,16 @@ fun MainScreen(vm: ControlViewModel) {
     val centerRgb = centerItem(s.rgbItems)
     val centerSw = centerItem(s.swItems)
 
-    Box(
+    BoxWithConstraints(
         Modifier.fillMaxSize().background(C.Bg2),
-        contentAlignment = Alignment.TopCenter,
+        contentAlignment = Alignment.Center,
     ) {
+        val canvasScale = minOf(1f, maxWidth / 390.dp, maxHeight / 844.dp)
         Box(
-            Modifier.size(390.dp, 844.dp)
+            Modifier.size(390.dp, 844.dp).graphicsLayer {
+                scaleX = canvasScale
+                scaleY = canvasScale
+            }
                 .background(Brush.verticalGradient(when (selectedTheme) { "Light" -> listOf(Color(0xFFE9EBF2), Color(0xFFD4D8E3)); "AMOLED" -> listOf(Color.Black, Color.Black); else -> listOf(C.Bg1, C.Bg2) }))
                 .clip(RoundedCornerShape(0.dp)),
         ) {
@@ -129,9 +138,9 @@ fun MainScreen(vm: ControlViewModel) {
             when (panel) {
                 Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
-                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, vm::toggleSelect, vm::toggleItemOn)
-                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, vm::toggleSelect, vm::toggleItemOn)
-                Panel.MENU -> MenuPanel { panel = Panel.NONE }
+                Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, rgbRevolverRotation, vm::toggleSelect, vm::toggleItemOn)
+                Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, switchRevolverRotation, vm::toggleSelect, vm::toggleItemOn)
+                Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> panel = Panel.NONE; sheet = target })
                 else -> {}
             }
         }
@@ -276,16 +285,26 @@ private fun InfoDetailPlaceholder(onClose: () -> Unit) {
 }
 
 @Composable
-private fun MenuPanel(onClose: () -> Unit) {
+private fun MenuPanel(onClose: () -> Unit, onOpen: (Sheet) -> Unit) {
+    val entries = listOf(
+        "Connections" to Sheet.DEVICES,
+        "Firmware configuration" to Sheet.FIRMWARE,
+        "Connection configuration" to Sheet.CONNECTION,
+        "Security / Owner Key" to Sheet.SECURITY,
+        "Effects catalogue" to Sheet.EFFECTS,
+    )
     Box(Modifier.fillMaxSize()) {
         Column(
-            Modifier.offset(130.dp, 304.dp).width(212.dp)
+            Modifier.offset(112.dp, 264.dp).width(230.dp)
                 .clip(RoundedCornerShape(22.dp)).background(C.Card).border(1.dp, C.Line, RoundedCornerShape(22.dp))
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            for (m in listOf("Connections", "Firmware update", "Backup & restore", "Help", "About")) {
-                Box(Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(12.dp)).clickable {}.padding(start = 14.dp), contentAlignment = Alignment.CenterStart) { T(m, 14f) }
+            entries.forEach { (label, target) ->
+                Box(Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpen(target) }.padding(start = 14.dp), contentAlignment = Alignment.CenterStart) {
+                    T(label, 13f)
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
         }
@@ -295,11 +314,12 @@ private fun MenuPanel(onClose: () -> Unit) {
 @Composable
 private fun ListRevolver(
     items: List<OutItem>, selected: Set<String>, mode: ScrollMode, sens: Int, ui: Int,
+    rotationState: androidx.compose.runtime.MutableFloatState,
     onSelect: (OutItem) -> Unit, onToggle: (OutItem) -> Unit,
 ) {
     Revolver(
         items = items.map { RevItem(it.label, sel = it.key in selected, on = it.on, dot = if (it.isRgb) it.color else null) },
-        mode = mode, sens = sens, ui = ui,
+        mode = mode, sens = sens, ui = ui, rotationState = rotationState,
         onName = { i -> items.getOrNull(i)?.let(onSelect) },
         onToggle = { i -> items.getOrNull(i)?.let(onToggle) },
     )
@@ -307,12 +327,26 @@ private fun ListRevolver(
 
 @Composable
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
-    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.THEME, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.SWITCH, "Scroll" to Sheet.SCROLL)
+    val items = listOf(
+        "Devices" to Sheet.DEVICES,
+        "Effects catalogue" to Sheet.EFFECTS,
+        "Firmware / GPIO setup" to Sheet.FIRMWARE,
+        "Connection config" to Sheet.CONNECTION,
+        "Security (Owner Key)" to Sheet.SECURITY,
+        "Scroll" to Sheet.SCROLL,
+        "UI style" to Sheet.UI,
+        "Theme" to Sheet.THEME,
+        "Switch config" to Sheet.SWITCH,
+    )
     Revolver(
-        items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) },
+        items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) } +
+            RevItem("Demo data", sel = false, on = s.demo, dot = null),
         mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
-        onName = { i -> items.getOrNull(i)?.second?.let(openSheet) },
-        onToggle = { i -> items.getOrNull(i)?.second?.let(openSheet) },
+        onName = { i ->
+            if (i == items.size) vm.setDemo(!s.demo)
+            else items.getOrNull(i)?.second?.let(openSheet)
+        },
+        onToggle = { i -> if (i == items.size) vm.setDemo(!s.demo) },
     )
 }
 
