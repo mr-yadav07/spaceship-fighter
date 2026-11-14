@@ -146,13 +146,14 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         if (l.sendJobs[key]?.isActive == true) return
         l.sendJobs[key]=scope.launch {
             while (true) {
-                val latest = lock.withLock {
+                val packet = lock.withLock {
                     val next=l.pending.remove(key)
                     if (next == null) l.sendJobs.remove(key)
-                    next
+                    if (next != null && l.state==LinkState.ONLINE) next else null
                 } ?: break
+                val ok = send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
                 lock.withLock {
-                    if(l.state==LinkState.ONLINE) send(l,latest[0].toInt() and 255,latest.copyOfRange(1,latest.size))
+                    if (!ok) l.lastError="BLE write failed"
                     publish()
                 }
             }
