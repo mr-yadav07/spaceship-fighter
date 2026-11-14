@@ -47,7 +47,7 @@ import app.espcontrol.core.LinkState
 import app.espcontrol.core.RouteKind
 
 private enum class Panel { NONE, SETTINGS, SCAN, RGB, SWITCH, MENU }
-private enum class Sheet { NONE, UI, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
+private enum class Sheet { NONE, UI, THEME, SWITCH, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
 
 @Composable
 fun MainScreen(vm: ControlViewModel) {
@@ -56,6 +56,9 @@ fun MainScreen(vm: ControlViewModel) {
     var sheet by remember { mutableStateOf(Sheet.NONE) }
     var infoOpen by remember { mutableStateOf(false) }
     var revolverUi by remember { mutableStateOf(1) }
+    var selectedTheme by remember { mutableStateOf("Dark") }
+    var switchPowerUp by remember { mutableStateOf("Last") }
+    var switchMode by remember { mutableStateOf("Toggle") }
 
     val eff = Triple(s.effR, s.effG, s.effB)
     val anySelOn = s.rgbPowerOn
@@ -71,7 +74,7 @@ fun MainScreen(vm: ControlViewModel) {
     ) {
         Box(
             Modifier.size(390.dp, 844.dp)
-                .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
+                .background(Brush.verticalGradient(when (selectedTheme) { "Light" -> listOf(Color(0xFFE9EBF2), Color(0xFFD4D8E3)); "AMOLED" -> listOf(Color.Black, Color.Black); else -> listOf(C.Bg1, C.Bg2) }))
                 .clip(RoundedCornerShape(0.dp)),
         ) {
         Box(Modifier.fillMaxSize().blur(if (panel != Panel.NONE || sheet != Sheet.NONE || infoOpen) 6.dp else 0.dp)) {
@@ -114,7 +117,7 @@ fun MainScreen(vm: ControlViewModel) {
         ActionRow(18.dp, 722.dp, "Switches", { vm.syncSwitches(centerSw) }, { vm.dselect(false) }, { vm.powerSwitches() })
         }
 
-        if (panel != Panel.NONE || infoOpen) {
+        if (panel != Panel.NONE || sheet != Sheet.NONE || infoOpen) {
             Box(
                 Modifier.fillMaxSize().background(Color(0x8C0A0B10))
                     .clickable { panel = Panel.NONE; sheet = Sheet.NONE; infoOpen = false },
@@ -137,6 +140,8 @@ fun MainScreen(vm: ControlViewModel) {
         AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             when (sheet) {
                 Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
+                Sheet.THEME -> ThemeSheet(selectedTheme, { selectedTheme = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
+                Sheet.SWITCH -> SwitchConfigSheet(s, switchPowerUp, switchMode, { switchPowerUp = it }, { switchMode = it }, { vm.setSelectedSwitches(true) }, { vm.setSelectedSwitches(false) }, { sheet = Sheet.NONE })
                 Sheet.DEVICES -> DevicesSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
                 Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
@@ -301,7 +306,7 @@ private fun ListRevolver(
 
 @Composable
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
-    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.NONE, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.NONE, "Scroll" to Sheet.SCROLL)
+    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.THEME, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.SWITCH, "Scroll" to Sheet.SCROLL)
     Revolver(
         items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) },
         mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
@@ -340,18 +345,88 @@ private fun UiStyleSheet(selected: Int, onSelect: (Int) -> Unit, onClose: () -> 
     }
 }
 
+
+@Composable
+private fun ThemeSheet(selected: String, onSelect: (String) -> Unit, onClose: () -> Unit) {
+    val themes = listOf("Dark" to Color(0xFF0E0F14), "Light" to Color(0xFFF2F3F7), "AMOLED" to Color.Black)
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.offset(56.dp, 236.dp).width(286.dp).height(340.dp)
+                .clip(RoundedCornerShape(24.dp)).background(Color(0xE612141C))
+                .border(1.dp, C.Line, RoundedCornerShape(24.dp)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            T("Theme", 17f, weight = FontWeight.SemiBold)
+            themes.forEach { (name, swatch) ->
+                Row(
+                    Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp))
+                        .background(if (selected == name) Color(0xFF1E2740) else Color(0xFF0E0F14))
+                        .border(2.dp, if (selected == name) C.Accent else C.Line, RoundedCornerShape(14.dp))
+                        .clickable { onSelect(name) }.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    T(name, 15f, weight = FontWeight.Medium)
+                    Box(Modifier.size(26.dp).clip(CircleShape).background(swatch).border(1.dp, C.Muted, CircleShape))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
+        }
+    }
+}
+
+@Composable
+private fun SwitchConfigSheet(
+    s: UiState, powerUp: String, mode: String, onPowerUp: (String) -> Unit, onMode: (String) -> Unit,
+    onSelectedOn: () -> Unit, onSelectedOff: () -> Unit, onClose: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.offset(56.dp, 236.dp).width(286.dp).height(340.dp)
+                .clip(RoundedCornerShape(24.dp)).background(Color(0xE612141C))
+                .border(1.dp, C.Line, RoundedCornerShape(24.dp)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            T("Switch", 17f, weight = FontWeight.SemiBold)
+            T("Applies to selected switches (${s.selSw.size})", 12f, C.Muted)
+            T("Power-up state", 13f, weight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Last", "ON", "OFF").forEach { item ->
+                    Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(12.dp))
+                        .background(if (powerUp == item) Color(0xFF1E2740) else C.Bg1)
+                        .border(1.dp, if (powerUp == item) C.Accent else C.Line, RoundedCornerShape(12.dp))
+                        .clickable { onPowerUp(item) }, contentAlignment = Alignment.Center) { T(item, 12f) }
+                }
+            }
+            T("Mode", 13f, weight = FontWeight.Medium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Toggle", "Momentary").forEach { item ->
+                    Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(12.dp))
+                        .background(if (mode == item) Color(0xFF1E2740) else C.Bg1)
+                        .border(1.dp, if (mode == item) C.Accent else C.Line, RoundedCornerShape(12.dp))
+                        .clickable { onMode(item) }, contentAlignment = Alignment.Center) { T(item, 12f) }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillButton("Selected ON", 120.dp, onSelectedOn, primary = true)
+                PillButton("Selected OFF", 120.dp, onSelectedOff)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onClose) }
+        }
+    }
+}
+
 @Composable
 private fun ScanPanel(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
     val scanStatus by vm.scanStatus.collectAsState()
     Box(Modifier.fillMaxSize()) {
         Column(
-            Modifier.offset(84.dp, 220.dp).width(258.dp)
+            Modifier.offset(84.dp, (190 - (s.devices.size.coerceAtMost(5) * 10)).coerceAtLeast(150).dp).width(258.dp)
                 .clip(RoundedCornerShape(26.dp)).background(C.Card).border(1.dp, C.Line, RoundedCornerShape(26.dp))
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             T(if (s.demo) "Devices · DEMO DATA ON" else "Devices · BLE", 16f, weight = FontWeight.SemiBold)
-            LazyColumn(Modifier.height(260.dp)) {
+            LazyColumn(Modifier.height((s.devices.size.coerceAtMost(5) * 56).coerceAtLeast(56).dp)) {
                 items(s.devices) { d -> DeviceRow(d, vm) }
                 if (s.devices.isEmpty()) item { T(scanStatus, 12f, C.Muted) }
             }
