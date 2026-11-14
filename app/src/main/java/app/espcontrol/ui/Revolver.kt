@@ -167,7 +167,7 @@ fun Revolver(
             if (x >= right - w - 3f && x <= right + 3f && y >= mid - h / 2f && y <= mid + h / 2f) {
                 if (best == null || s.scale > best.scale) {
                     best = s
-                    circle = x > right - gg.circle * s.scale - 2f
+                    circle = !curFinite && x > right - gg.circle * s.scale - 2f
                 }
             }
         }
@@ -243,7 +243,7 @@ fun Revolver(
             ) {
                 val shape = RoundedCornerShape(14.dp)
                 Box(
-                    Modifier.width(g.pill.dp).height(g.h.dp).clip(shape).background(C.Card)
+                    Modifier.width((if (finite) g.w else g.pill).dp).height(g.h.dp).clip(shape).background(C.Card)
                         .border(2.dp, if (item.sel) C.Orange else C.Accent, shape),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -252,10 +252,12 @@ fun Revolver(
                         T(item.name, g.font, C.Text, FontWeight.Medium)
                     }
                 }
-                Box(
-                    Modifier.size(g.circle.dp).clip(CircleShape).background(if (item.on) C.Green else C.Track),
-                    contentAlignment = Alignment.Center,
-                ) { T(if (item.on) "ON" else "OFF", 11f, if (item.on) Color(0xFF0E0F14) else C.Muted, FontWeight.SemiBold) }
+                if (!finite) {
+                    Box(
+                        Modifier.size(g.circle.dp).clip(CircleShape).background(if (item.on) C.Green else C.Track),
+                        contentAlignment = Alignment.Center,
+                    ) { T(if (item.on) "ON" else "OFF", 11f, if (item.on) Color(0xFF0E0F14) else C.Muted, FontWeight.SemiBold) }
+                }
             }
         }
     }
