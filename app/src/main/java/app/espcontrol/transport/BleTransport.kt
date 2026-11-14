@@ -53,6 +53,7 @@ class BleTransport(private val ctx: Context) : Transport {
     private val scanStatusFlow = MutableStateFlow("Bluetooth status unknown")
     val scanStatus: StateFlow<String> = scanStatusFlow.asStateFlow()
     private var compatibleFound = 0
+    private var rawFound = 0
     /** BLE addresses with a fully set-up GATT session. */
     val ready: StateFlow<Set<String>> = readyFlow.asStateFlow()
 
@@ -125,19 +126,40 @@ class BleTransport(private val ctx: Context) : Transport {
     // ---- scanning ----
     private val scanCb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val name = result.scanRecord?.deviceName?.takeIf { it.isNotBlank() }
-                ?: runCatching { result.device.name }.getOrNull() ?: return
-            if (!name.startsWith(namePrefix, ignoreCase = true)) return
-            val id = name.substring(namePrefix.length).lowercase()
+            rawFound++
+            val record = result.scanRecord
+            val advertisedName = record?.deviceName?.takeIf { it.isNotBlank() }
+                ?: runCatching { result.device.name }.getOrNull().orEmpty()
+            val serviceAdvertised = record?.serviceUuids?.any { it.uuid == serviceUuid } == true
+            val prefixMatch = advertisedName.startsWith(namePrefix, ignoreCase = true)
+            if (!serviceAdvertised && !prefixMatch) {
+                if (rawFound % 20 == 0) scanStatusFlow.value =
+                    "Scanning… $rawFound BLE advertisements checked; no ESPControl device yet"
+                return
+            }
+            val addressId = result.device.address.replace(":", "").lowercase().takeLast(12)
+            val id = if (prefixMatch) advertisedName.substring(namePrefix.length).lowercase() else addressId
             if (!id.matches(Regex("[0-9a-f]{12}"))) return
+            val displayName = advertisedName.ifBlank { namePrefix + id }
             compatibleFound++
-            scanStatusFlow.value = "Scanning · " + compatibleFound + " compatible device(s) found"
-            advertFlow.tryEmit(Advert(result.device.address, id, name, result.rssi))
+            scanStatusFlow.value = "Found $compatibleFound ESPControl device(s)"
+            advertFlow.tryEmit(Advert(result.device.address, id, displayName, result.rssi))
+        }
+
+        override fun onBatchScanResults(results: MutableList<ScanResult>) {
+            results.forEach { onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it) }
         }
 
         override fun onScanFailed(errorCode: Int) {
             scanning = false
-            scanStatusFlow.value = "BLE scan failed · error " + errorCode
+            scanStatusFlow.value = when (errorCode) {
+                SCAN_FAILED_ALREADY_STARTED -> "BLE scan already running"
+                SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "Android could not register the BLE scanner"
+                SCAN_FAILED_FEATURE_UNSUPPORTED -> "BLE scanning is unsupported on this phone"
+                SCAN_FAILED_INTERNAL_ERROR -> "Android BLE scan internal error"
+                SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "BLE scan hardware resources unavailable"
+                else -> "BLE scan failed · Android error $errorCode"
+            }
         }
     }
 
@@ -154,8 +176,13 @@ class BleTransport(private val ctx: Context) : Transport {
         val scanner = adapter.bluetoothLeScanner
         if (scanner == null) { scanStatusFlow.value = "BLE scanner unavailable · check Bluetooth"; return }
         compatibleFound = 0
-        scanStatusFlow.value = "Starting BLE scan…"
-        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+        rawFound = 0
+        scanStatusFlow.value = "Starting active BLE scan…"
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setReportDelay(0L)
+            .build()
         try {
             scanner.startScan(null, settings, scanCb)
             scanning = true
@@ -195,7 +222,8 @@ class BleTransport(private val ctx: Context) : Transport {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             val addr = g.device.address
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                g.requestMtu(517)
+                val requested = runCatching { g.requestMtu(517) }.getOrDefault(false)
+                if (!requested) g.discoverServices()
             } else {
                 conns.remove(addr)
                 try { g.close() } catch (e: Exception) { /* ignore */ }
@@ -216,7 +244,7 @@ class BleTransport(private val ctx: Context) : Transport {
             val cccd = evt?.getDescriptor(CCCD)
             if (status != BluetoothGatt.GATT_SUCCESS || cmd == null || evt == null || cccd == null) { g.disconnect(); return }
             c.cmd = cmd
-            g.setCharacteristicNotification(evt, true)
+            if (!g.setCharacteristicNotification(evt, true)) { g.disconnect(); return }
             writeDescriptor(g, cccd)
         }
 
