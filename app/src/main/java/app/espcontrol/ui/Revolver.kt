@@ -175,10 +175,11 @@ fun Revolver(
         if (circle) toggleCb(b.i) else nameCb(b.i)
     }
 
-    Box(
-        Modifier.offset(g.panLeft.dp, g.panTop.dp).size(g.panWidth.dp, g.panHeight.dp)
-            .clip(CircleShape).background(Color(0x8C12141C)).border(1.dp, C.Line, CircleShape)
-            .pointerInput(Unit) {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.offset(g.panLeft.dp, g.panTop.dp).size(g.panWidth.dp, g.panHeight.dp)
+                .clip(CircleShape).background(Color(0x8C12141C)).border(1.dp, C.Line, CircleShape)
+                            .pointerInput(Unit) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -230,13 +231,13 @@ fun Revolver(
                     }
                 }
             },
-    ) {
-        Box(Modifier.offset((390f - g.r - g.panLeft).dp, (CY - g.b - g.panTop).dp).size((g.r * 2).dp, (g.b * 2).dp).border(1.dp, Color(0x24FFFFFF), CircleShape))
+        )
+        Box(Modifier.offset((390f - g.r).dp, (CY - g.b).dp).size((g.r * 2).dp, (g.b * 2).dp).border(1.dp, Color(0x24FFFFFF), CircleShape))
         for (s in slots(n, rot, ui, finite)) {
             if (!s.vis) continue
             val item = items.getOrNull(s.i) ?: continue
             Row(
-                Modifier.offset((s.left - g.panLeft).dp, (s.top - g.panTop).dp).size(g.w.dp, g.h.dp)
+                Modifier.offset(s.left.dp, s.top.dp).size(g.w.dp, g.h.dp)
                     .graphicsLayer { scaleX = s.scale; scaleY = s.scale; alpha = s.op; transformOrigin = TransformOrigin(1f, 0.5f) },
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
