@@ -532,7 +532,7 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
                         text = generated,
                         color = C.Text,
                         style = androidx.compose.ui.text.TextStyle(
-                            fontSize = 9.5f.sp,
+                            fontSize = androidx.compose.ui.unit.TextUnit(9.5f, androidx.compose.ui.unit.TextUnitType.Sp),
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         ),
                         modifier = Modifier.fillMaxWidth().height(240.dp).verticalScroll(rememberScrollState()),
