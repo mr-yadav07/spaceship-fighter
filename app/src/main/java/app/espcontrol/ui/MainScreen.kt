@@ -247,7 +247,7 @@ private fun SideColumn(
     panel: Panel, onSettings: () -> Unit, onScan: () -> Unit,
     onRgb: () -> Unit, onSwitch: () -> Unit, onMenu: () -> Unit,
 ) {
-    Column(Modifier.offset(344.dp, 262.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
+    Column(Modifier.offset(344.dp, 262.dp), verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.End) {
         SideBtn(panel == Panel.MENU, onMenu) { MenuIcon() }
         SideBtn(panel == Panel.SCAN, onScan) { T("Scan", 11f) }
         SideBtn(panel == Panel.SETTINGS, onSettings) { GearIcon() }
@@ -259,7 +259,7 @@ private fun SideColumn(
 @Composable
 private fun SideBtn(active: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(
-        Modifier.size(46.dp, 52.dp)
+        Modifier.size(46.dp, 46.dp)
             .clip(RoundedCornerShape(topStart = 21.dp, bottomStart = 21.dp))
             .background(if (active) Color(0xFF1E2740) else Color(0xDB1E212D))
             .border(1.dp, if (active) C.Accent else C.Line, RoundedCornerShape(topStart = 21.dp, bottomStart = 21.dp))
