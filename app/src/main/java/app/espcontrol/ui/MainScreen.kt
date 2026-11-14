@@ -96,11 +96,11 @@ fun MainScreen(vm: ControlViewModel) {
         Column(Modifier.offset(288.dp, 302.dp).width(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.clip(RoundedCornerShape(8.dp)).background(C.Track).padding(horizontal = 6.dp, vertical = 2.dp)) { T("${s.br}", 11f, weight = FontWeight.SemiBold) }
         }
-        VSlider(s.br, 255, { vm.setBrightness(it) }, Modifier.offset(314.dp, 312.dp).size(14.dp, 184.dp))
+        VSlider(s.br, 255, { vm.setBrightness(it) }, Modifier.offset(323.dp, 312.dp).size(14.dp, 184.dp))
 
-        ChannelSlider(96.dp, 520.dp, "R", s.r, s.enR, C.RedCh, { vm.setChannel(0, it) }, { vm.toggleChannel(0) })
-        ChannelSlider(96.dp, 562.dp, "G", s.g, s.enG, C.GreenCh, { vm.setChannel(1, it) }, { vm.toggleChannel(1) })
-        ChannelSlider(96.dp, 604.dp, "B", s.b, s.enB, C.BlueCh, { vm.setChannel(2, it) }, { vm.toggleChannel(2) })
+        ChannelSlider(116.dp, 520.dp, "R", s.r, s.enR, C.RedCh, { vm.setChannel(0, it) }, { vm.toggleChannel(0) })
+        ChannelSlider(116.dp, 562.dp, "G", s.g, s.enG, C.GreenCh, { vm.setChannel(1, it) }, { vm.toggleChannel(1) })
+        ChannelSlider(116.dp, 604.dp, "B", s.b, s.enB, C.BlueCh, { vm.setChannel(2, it) }, { vm.toggleChannel(2) })
 
         ActionRow(18.dp, 676.dp, "RGB", { vm.syncRgb() }, { vm.dselect(true) }, { vm.togglePower() })
         ActionRow(18.dp, 722.dp, "Switches", { vm.syncSwitches(centerSw) }, { vm.dselect(false) }, { vm.powerSwitches() })
@@ -147,7 +147,7 @@ private fun centerItem(items: List<OutItem>): OutItem? = items.firstOrNull { it.
 @Composable
 private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: OutItem?, onOpen: () -> Unit) {
     Column(
-        Modifier.offset(58.dp, 48.dp).width(274.dp)
+        Modifier.offset(58.dp, 48.dp).width(274.dp).height(236.dp)
             .clip(RoundedCornerShape(28.dp))
             .background(Brush.verticalGradient(listOf(Color(0x12FFFFFF), Color(0x06FFFFFF))))
             .border(1.dp, C.Line, RoundedCornerShape(28.dp))
@@ -184,7 +184,7 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun ChannelSlider(x: androidx.compose.ui.unit.Dp, y: androidx.compose.ui.unit.Dp, letter: String, value: Int, on: Boolean, color: Color, onChange: (Int) -> Unit, onToggle: () -> Unit) {
     HSlider(value, 255, if (on) color else C.Off, onChange, Modifier.offset(x, y).width(212.dp))
-    ChannelButton(letter, on, color, if (letter == "B") Color.White else Color(0xFF0E0F14), onToggle, Modifier.offset(316.dp, y - 4.dp))
+    ChannelButton(letter, on, color, if (letter == "B") Color.White else Color(0xFF0E0F14), onToggle, Modifier.offset(344.dp, y - 4.dp))
 }
 
 @Composable
@@ -206,7 +206,7 @@ private fun SideColumn(
     panel: Panel, onSettings: () -> Unit, onScan: () -> Unit,
     onRgb: () -> Unit, onSwitch: () -> Unit, onMenu: () -> Unit,
 ) {
-    Column(Modifier.offset(348.dp, 294.dp), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+    Column(Modifier.offset(344.dp, 262.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
         SideBtn(panel == Panel.SETTINGS, onSettings) { GearIcon() }
         SideBtn(panel == Panel.SCAN, onScan) { T("Scan", 11f) }
         SideBtn(panel == Panel.RGB, onRgb) { T("RGB", 11f) }
@@ -218,7 +218,7 @@ private fun SideColumn(
 @Composable
 private fun SideBtn(active: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(
-        Modifier.size(42.dp, 42.dp)
+        Modifier.size(46.dp, 52.dp)
             .clip(RoundedCornerShape(topStart = 21.dp, bottomStart = 21.dp))
             .background(if (active) Color(0xFF1E2740) else Color(0xDB1E212D))
             .border(1.dp, if (active) C.Accent else C.Line, RoundedCornerShape(topStart = 21.dp, bottomStart = 21.dp))
