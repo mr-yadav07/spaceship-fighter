@@ -66,7 +66,7 @@ fun MainScreen(vm: ControlViewModel) {
         Modifier.fillMaxSize()
             .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
             .clip(RoundedCornerShape(0.dp)),
-    ) {{
+    ) {
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
