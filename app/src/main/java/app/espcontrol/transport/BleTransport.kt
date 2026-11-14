@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -63,6 +65,7 @@ class BleTransport(private val ctx: Context) : Transport {
         @Volatile var cmd: BluetoothGattCharacteristic? = null
         @Volatile var ready = false
         @Volatile var mtu = 23
+        val writeMutex = Mutex()
     }
 
 
@@ -316,14 +319,43 @@ class BleTransport(private val ctx: Context) : Transport {
     suspend fun send(address: String, bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
         val c = conns[address] ?: return@withContext false
         val ch = c.cmd
-        if (!c.ready || ch == null || bytes.size > c.mtu - 3) return@withContext false
-        if (Build.VERSION.SDK_INT >= 33) {
-            c.gatt.writeCharacteristic(ch, bytes, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) == BluetoothStatusCodes.SUCCESS
-        } else {
-            ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            ch.value = bytes
-            c.gatt.writeCharacteristic(ch)
+        if (!c.ready || ch == null || bytes.size < 6) return@withContext false
+        c.writeMutex.withLock {
+            val mtuPayload = (c.mtu - 3).coerceAtLeast(20)
+            val packets = if (bytes.size <= mtuPayload) listOf(bytes) else splitV2Command(bytes, mtuPayload) ?: return@withLock false
+            for (packet in packets) {
+                val ok = if (Build.VERSION.SDK_INT >= 33) {
+                    c.gatt.writeCharacteristic(ch, packet, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    ch.value = packet
+                    c.gatt.writeCharacteristic(ch)
+                }
+                if (!ok) return@withLock false
+            }
+            true
         }
+    }
+
+    private fun splitV2Command(frame: ByteArray, maxBytes: Int): List<ByteArray>? {
+        if (frame.size < 7 || (frame[0].toInt() and 255) != 0xEC ||
+            (frame[1].toInt() and 255) != 0x53 || (frame[2].toInt() and 255) != 2) return null
+        val type=frame[3].toInt() and 255
+        val recordSize=when(type) { 0x10 -> 2; 0x11 -> 6; 0x12 -> 3; else -> return null }
+        val payloadLength=(frame[4].toInt() and 255) or ((frame[5].toInt() and 255) shl 8)
+        if(payloadLength != frame.size-6 || payloadLength < 1) return null
+        val count=frame[6].toInt() and 255
+        if(payloadLength != 1+count*recordSize) return null
+        val perPacket=((maxBytes-7)/recordSize).coerceAtLeast(1)
+        val result=ArrayList<ByteArray>()
+        var offset=7
+        while(offset<frame.size) {
+            val n=minOf(perPacket,(frame.size-offset)/recordSize)
+            val payload=byteArrayOf(n.toByte())+frame.copyOfRange(offset,offset+n*recordSize)
+            result += byteArrayOf(frame[0],frame[1],frame[2],frame[3],payload.size.toByte(),(payload.size ushr 8).toByte())+payload
+            offset+=n*recordSize
+        }
+        result
     }
 
     companion object {
