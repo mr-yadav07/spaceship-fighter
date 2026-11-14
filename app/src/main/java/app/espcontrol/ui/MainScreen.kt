@@ -167,7 +167,7 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
             .background(Brush.verticalGradient(listOf(Color(0x12FFFFFF), Color(0x06FFFFFF))))
             .border(1.dp, C.Line, RoundedCornerShape(28.dp))
             .clickable(onClick = onOpen)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             T("INFORMATION", 11f, C.Muted, FontWeight.SemiBold)
@@ -180,9 +180,16 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
         InfoRow("Connected", "$connected devices")
         InfoRow("RGB", "${s.selRgb.size}/${s.rgbItems.size} sel · ${s.rgbItems.count { it.on }} on")
         InfoRow("Switches", "${s.selSw.size}/${s.swItems.size} sel · ${s.swItems.count { it.on }} on")
-        InfoRow("Colour", "R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}")
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            T("Colour", 12.5f, C.Muted, modifier = Modifier.width(96.dp))
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(Color(if (s.enR) s.r else 0, if (s.enG) s.g else 0, if (s.enB) s.b else 0)))
+                T("R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}", 12.5f, C.Text)
+            }
+        }
         InfoRow("Brightness", "${(s.br * 100 / 255)}%")
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(8.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
         T(s.msg, 12f, C.Warn, modifier = Modifier.padding(top = 6.dp))
     }
