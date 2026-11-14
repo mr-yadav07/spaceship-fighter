@@ -278,7 +278,7 @@ private fun ListRevolver(
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, openSheet: (Sheet) -> Unit) {
     val items = listOf("Devices" to Sheet.DEVICES, "Effects catalogue" to Sheet.EFFECTS, "Firmware / GPIO setup" to Sheet.FIRMWARE, "Connection config" to Sheet.CONNECTION, "Security (Owner Key)" to Sheet.SECURITY, "Scroll" to Sheet.SCROLL, "Demo data" to Sheet.NONE)
     Revolver(
-        items = items.mapIndexed { i, (n, _) -> RevItem(n, sel = false, on = i == 4 && s.demo, dot = null) },
+        items = items.mapIndexed { i, (n, _) -> RevItem(n, sel = false, on = i == 6 && s.demo, dot = null) },
         mode = s.mode, sens = s.sens[s.mode] ?: 0,
         onName = { i -> if (items[i].second == Sheet.NONE) vm.setDemo(!s.demo) else openSheet(items[i].second) },
         onToggle = { i -> if (items[i].second == Sheet.NONE) vm.setDemo(!s.demo) },
@@ -287,6 +287,7 @@ private fun SettingsRevolver(vm: ControlViewModel, s: UiState, openSheet: (Sheet
 
 @Composable
 private fun ScanPanel(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
+    val scanStatus by vm.scanStatus.collectAsState()
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier.offset(84.dp, 220.dp).width(258.dp)
@@ -294,10 +295,10 @@ private fun ScanPanel(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            T("Devices", 16f, weight = FontWeight.SemiBold)
+            T(if (s.demo) "Devices · DEMO DATA ON" else "Devices · BLE", 16f, weight = FontWeight.SemiBold)
             LazyColumn(Modifier.height(260.dp)) {
                 items(s.devices) { d -> DeviceRow(d, vm) }
-                if (s.devices.isEmpty()) item { T("Searching…", 13f, C.Muted) }
+                if (s.devices.isEmpty()) item { T(scanStatus, 12f, C.Muted) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 PillButton("Rescan", 90.dp, { vm.rescan() })
