@@ -29,6 +29,7 @@ Receivers validate magic, version, exact frame length, message type, payload bou
 - `0x10 SWITCH_SET` App -> ESP
 - `0x11 RGB_SET` App -> ESP
 - `0x12 EFFECT_SET` App -> ESP
+- `0x13 RGB_TRANSITION` App -> ESP (target RGB + duration + common start delay)
 - `0x20 UPDATE` ESP -> App (delta only)
 - `0x21 STATUS_REQUEST` App -> ESP
 - `0x22 STATUS` ESP -> App (complete snapshot)
@@ -45,8 +46,9 @@ IDs are unique within a candidate kind on one ESP32. Names are display labels. E
 Each command payload starts with `count:u8`; only included candidates change.
 - SWITCH_SET: repeated `candidateId:u8, value:u8` where 0=OFF, 1=ON.
 - RGB_SET: repeated `candidateId:u8, red:u8, green:u8, blue:u8, brightness:u8, power:u8`. Power 0=OFF, 1=ON. RGB color, brightness and power are independent values; power-off must not erase the stored color or brightness.
+- RGB_TRANSITION: repeated `candidateId:u8, red:u8, green:u8, blue:u8, brightness:u8, power:u8, durationMs:u16, startDelayMs:u16`. Firmware interpolates from the currently rendered state to the target locally at approximately 60 FPS. Updates received during an active transition replace its target from the current interpolated value; first transition in a group uses the common start delay.
 - EFFECT_SET: repeated `candidateId:u8, effectId:u8, speed:u8`. Effect ID 0 means stop.
-- The app coalesces latest unsent values per (device, kind, candidateId). Different candidates must never overwrite one another.
+- The app coalesces latest unsent RGB batches per device and serializes acknowledged GATT writes per connection. Different candidates must never overwrite one another. Selected devices receive updates concurrently, with a shared start delay to reduce visible skew. BLE radio airtime is still shared; this is near-simultaneous, not physically simultaneous.
 
 ## Feedback
 UPDATE and STATUS start with `count:u8` and use typed entries:
@@ -56,7 +58,7 @@ UPDATE and STATUS start with `count:u8` and use typed entries:
 UPDATE contains only values that have actually been applied and changed. STATUS contains all configured switch/RGB candidates and the current effect state for each RGB candidate.
 
 ## Scheduling and safety
-- Apply accepted values promptly. Firmware hardware hooks return true only after the requested state has actually been applied.
+- Apply accepted values promptly. RGB transitions render locally at approximately 60 FPS; non-RGB commands apply promptly. The first frame of a coordinated group uses a common start delay so independently delivered BLE packets can begin close together.
 - After an applied change, schedule a consolidated UPDATE for 500 ms after the most recent applied change. Reset the debounce when another change is applied. Keep only the latest state for a given (kind,id), while preserving other candidates.
 - STATUS_REQUEST returns a full snapshot read from actual/current state.
 - Validate the complete batch before applying any entry. Malformed frames, unknown IDs, invalid booleans and unsupported effects are rejected safely. Never write an unconfigured GPIO from a packet.
