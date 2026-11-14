@@ -19,12 +19,14 @@ object FirmwareCodeGenerator {
                     (it.type == "SWITCH" || (it.type == "RGB" && it.leds.toIntOrNull()?.let { n -> n in 1..65535 } == true))
             } && candidates.map { it.type to it.id }.distinct().size == candidates.size
         require(valid) { "Use 1–12 candidates, unique IDs per type and GPIO pins (0–39), and RGB LED counts from 1–65535." }
-        val safeName = deviceName.replace("\\\\", "").replace("\\\"", "").replace("\\n", " ").replace("\\r", " ").take(32).ifBlank { "ESP32" }
-        val rows = candidates.joinToString(",\\n") { c ->
-            val id = c.id.toInt()
-            val pin = c.gpio.toInt()
-            val name = (c.name.ifBlank { "${c.type} $id" }).replace("\\\\", "").replace("\\\"", "").replace("\\n", " ").replace("\\r", " ").take(24)
-            if (c.type == "RGB") "  {RGB_KIND, $id, $pin, ${c.leds.toInt()}, \"$name\"}"
+        val safeName = deviceName.filter { it.isLetterOrDigit() || it == '_' || it == '-' || it == ' ' }
+            .take(32).ifBlank { "ESP32" }
+        val rows = candidates.joinToString(",\n") { candidate ->
+            val id = candidate.id.toInt()
+            val pin = candidate.gpio.toInt()
+            val name = candidate.name.filter { it.isLetterOrDigit() || it == '_' || it == '-' || it == ' ' }
+                .take(24).ifBlank { "\${candidate.type} $id" }
+            if (candidate.type == "RGB") "  {RGB_KIND, $id, $pin, \${candidate.leds.toInt()}, \"$name\"}"
             else "  {SWITCH_KIND, $id, $pin, 0, \"$name\"}"
         }
         return SOURCE.replace("@DEVICE@", safeName).replace("@CANDIDATES@", rows)
