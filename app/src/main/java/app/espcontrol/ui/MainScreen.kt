@@ -10,7 +10,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,11 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.espcontrol.core.DeviceInfo
@@ -65,21 +62,11 @@ fun MainScreen(vm: ControlViewModel) {
     val centerRgb = centerItem(s.rgbItems)
     val centerSw = centerItem(s.swItems)
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(C.Bg2)) {
-        // The reference artwork uses a 390 × 1024 portrait design canvas.
-        // Fit the complete canvas to the available phone viewport without stretching it.
-        val scale = minOf(maxWidth / 390.dp, maxHeight / 1024.dp)
-        val canvasWidth = 390.dp * scale
-        val canvasHeight = 1024.dp * scale
-        Box(
-            Modifier.offset(
-                x = (maxWidth - canvasWidth) / 2,
-                y = (maxHeight - canvasHeight) / 2,
-            ).size(390.dp, 1024.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f) }
-                .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
-                .clip(RoundedCornerShape(0.dp)),
-        ) {
+    Box(
+        Modifier.fillMaxSize()
+            .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
+            .clip(RoundedCornerShape(0.dp)),
+    ) {{
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
@@ -151,7 +138,6 @@ fun MainScreen(vm: ControlViewModel) {
             onSwitch = { panel = if (panel == Panel.SWITCH) Panel.NONE else Panel.SWITCH },
             onMenu = { panel = if (panel == Panel.MENU) Panel.NONE else Panel.MENU },
         )
-        }
     }
 }
 
