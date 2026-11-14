@@ -325,7 +325,6 @@ class BleTransport(private val ctx: Context) : Transport {
     }
 
     @Suppress("DEPRECATION")
-    @Suppress("DEPRECATION")
     suspend fun send(address: String, bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
         val c = conns[address] ?: return@withContext false
         c.writeLock.withLock {
