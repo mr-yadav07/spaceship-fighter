@@ -522,12 +522,22 @@ private fun FirmwareSheet(s: UiState, onClose: () -> Unit) {
             if(error.isNotBlank()) T(error,11f,C.Danger)
             if(generated.isNotBlank()) {
                 T("Generated upload-ready sketch",12f,C.Orange,FontWeight.SemiBold)
-                T("Copy the complete sketch into Arduino IDE. Install NimBLE-Arduino 2.x and Adafruit NeoPixel, select your ESP32 board, then upload.",11f,C.Muted)
+                T("Use the Copy button for the complete source. Install NimBLE-Arduino 2.x and Adafruit NeoPixel, select ESP32 Dev Module, then upload.",11f,C.Muted)
                 PillButton("Copy complete firmware code",230.dp,{
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(generated))
                 },primary=true)
-                T("Firmware source preview",11f,C.Muted)
-                T(generated,9.5f,C.Text)
+                T("Firmware source preview · select text if needed",11f,C.Muted)
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    androidx.compose.material3.Text(
+                        text = generated,
+                        color = C.Text,
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontSize = 9.5f.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(240.dp).verticalScroll(rememberScrollState()),
+                    )
+                }
             }
             T("Device candidates and effect catalogue are sent by the firmware through BLE CAPS. The app lists only candidates belonging to currently connected devices.",10.5f,C.Warn)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){BackBtn(onClose)}
