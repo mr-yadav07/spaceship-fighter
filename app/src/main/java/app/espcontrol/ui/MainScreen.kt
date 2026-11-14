@@ -82,7 +82,7 @@ fun MainScreen(vm: ControlViewModel) {
         InfoCard(s, connected, centerRgb, centerSw, onOpen = { infoOpen = true })
 
         ColorDisc(
-            Modifier.offset(102.dp, 312.dp).size(184.dp),
+            Modifier.offset(102.dp, 312.dp).size(184.dp).alpha(if (anySelOn) 1f else 0.4f),
             eff, discShade,
         ) { r, g, b -> vm.setColor(r, g, b) }
         Box(Modifier.offset(102.dp, 312.dp).size(184.dp), contentAlignment = Alignment.Center) {
