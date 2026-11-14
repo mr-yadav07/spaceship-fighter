@@ -46,6 +46,7 @@ data class UiState(
 class ControlViewModel(app: Application) : AndroidViewModel(app) {
     private val espApp = app as EspApp
     private val hub = espApp.hub
+    val scanStatus = hub.scanStatus
     private val prefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
     private data class Local(
