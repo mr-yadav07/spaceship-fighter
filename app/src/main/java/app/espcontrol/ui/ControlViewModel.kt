@@ -134,9 +134,15 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun pushColor() {
         val s = ui.value
-        for (it in selected(true)) {
-            if (s.demo) demoUpdate(it.key) { x -> x.copy(color = Color(s.effR, s.effG, s.effB)) }
-            else hub.setRgb(it.devId, it.out, s.effR, s.effG, s.effB)
+        val targets = selected(true)
+        if (s.demo) {
+            targets.forEach { item -> demoUpdate(item.key) { x -> x.copy(color = Color(s.effR, s.effG, s.effB)) } }
+        } else {
+            targets.groupBy { it.devId }.forEach { (deviceId, outputs) ->
+                hub.setRgbs(deviceId, outputs.map { item ->
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,s.effR,s.effG,s.effB,s.br,item.on)
+                })
+            }
         }
     }
 
