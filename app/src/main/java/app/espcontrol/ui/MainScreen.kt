@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -46,7 +47,7 @@ import app.espcontrol.core.LinkState
 import app.espcontrol.core.RouteKind
 
 private enum class Panel { NONE, SETTINGS, SCAN, RGB, SWITCH, MENU }
-private enum class Sheet { NONE, UI, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
+private enum class Sheet { NONE, UI, THEME, SWITCH, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
 
 @Composable
 fun MainScreen(vm: ControlViewModel) {
@@ -73,6 +74,7 @@ fun MainScreen(vm: ControlViewModel) {
                 .background(Brush.verticalGradient(listOf(C.Bg1, C.Bg2)))
                 .clip(RoundedCornerShape(0.dp)),
         ) {
+        Box(Modifier.fillMaxSize().blur(if (panel != Panel.NONE || sheet != Sheet.NONE || infoOpen) 6.dp else 0.dp)) {
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
@@ -110,11 +112,12 @@ fun MainScreen(vm: ControlViewModel) {
 
         ActionRow(18.dp, 676.dp, "RGB", { vm.syncRgb() }, { vm.dselect(true) }, { vm.togglePower() })
         ActionRow(18.dp, 722.dp, "Switches", { vm.syncSwitches(centerSw) }, { vm.dselect(false) }, { vm.powerSwitches() })
+        }
 
         if (panel != Panel.NONE) {
             Box(
                 Modifier.fillMaxSize().background(Color(0x8C0A0B10))
-                    .clickable { panel = Panel.NONE; sheet = Sheet.NONE },
+                    .clickable { panel = Panel.NONE; sheet = Sheet.NONE; infoOpen = false },
             )
         }
 
@@ -134,6 +137,8 @@ fun MainScreen(vm: ControlViewModel) {
         AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             when (sheet) {
                 Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
+                Sheet.THEME -> ThemeSheet(s, vm) { sheet = Sheet.NONE }
+                Sheet.SWITCH -> SwitchConfigSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.DEVICES -> DevicesSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
                 Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
@@ -229,11 +234,11 @@ private fun SideColumn(
     onRgb: () -> Unit, onSwitch: () -> Unit, onMenu: () -> Unit,
 ) {
     Column(Modifier.offset(344.dp, 262.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
-        SideBtn(panel == Panel.SETTINGS, onSettings) { GearIcon() }
+        SideBtn(panel == Panel.MENU, onMenu) { MenuIcon() }
         SideBtn(panel == Panel.SCAN, onScan) { T("Scan", 11f) }
+        SideBtn(panel == Panel.SETTINGS, onSettings) { GearIcon() }
         SideBtn(panel == Panel.RGB, onRgb) { T("RGB", 11f) }
         SideBtn(panel == Panel.SWITCH, onSwitch) { T("0/1", 11f) }
-        SideBtn(panel == Panel.MENU, onMenu) { MenuIcon() }
     }
 }
 
@@ -298,7 +303,7 @@ private fun ListRevolver(
 
 @Composable
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
-    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.NONE, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.NONE, "Scroll" to Sheet.SCROLL)
+    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.THEME, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.SWITCH, "Scroll" to Sheet.SCROLL)
     Revolver(
         items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) },
         mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
