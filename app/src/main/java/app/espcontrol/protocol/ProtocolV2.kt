@@ -106,5 +106,5 @@ object ProtocolV2 {
 
     data class RgbCommand(val id:Int,val r:Int,val g:Int,val b:Int,val brightness:Int,val on:Boolean)
     data class EffectCommand(val id:Int,val effectId:Int,val speed:Int)
-    data class RgbTransitionCommand(val id:Int,val r:Int,val g:Int,val b:Int,val brightness:Int,val on:Boolean,val durationMs:Int=180,val startDelayMs:Int=60)
+    data class RgbTransitionCommand(val id:Int,val r:Int,val g:Int,val b:Int,val brightness:Int,val on:Boolean,val durationMs:Int=100,val startDelayMs:Int=60)
 }
