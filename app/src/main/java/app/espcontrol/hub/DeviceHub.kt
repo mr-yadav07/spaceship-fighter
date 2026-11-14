@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -158,12 +159,19 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
                     }
                 }
                 if(batch.isEmpty()) break
-                for((_,packet) in batch) {
+                for((key,packet) in batch) {
                     val online=lock.withLock { l.state==LinkState.ONLINE }
                     if(online) {
-                        val ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
+                        var ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
+                        if(!ok) {
+                            val newerPending=lock.withLock { key in l.pending }
+                            if(!newerPending) {
+                                delay(20)
+                                ok=send(l,packet[0].toInt() and 255,packet.copyOfRange(1,packet.size))
+                            }
+                        }
                         lock.withLock {
-                            if(!ok) l.lastError="BLE write failed · reconnect or change the target to retry"
+                            if(!ok) l.lastError="BLE write failed · latest target retained for the next update"
                             else l.lastError=null
                             publish()
                         }
