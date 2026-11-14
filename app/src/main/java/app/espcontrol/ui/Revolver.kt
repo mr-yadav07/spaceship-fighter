@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -114,13 +115,15 @@ private fun slots(n: Int, rot: Float, ui: Int, finite: Boolean): List<Slot> {
 @Composable
 fun Revolver(
     items: List<RevItem>, mode: ScrollMode, sens: Int, ui: Int = 1, finite: Boolean = false,
+    rotationState: MutableFloatState? = null,
     onName: (Int) -> Unit, onToggle: (Int) -> Unit,
 ) {
     val n = items.size
     val g = geometry(ui)
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
-    var rot by remember { mutableFloatStateOf(0f) }
+    val rotState = rotationState ?: remember { mutableFloatStateOf(0f) }
+    var rot by rotState
     var motion by remember { mutableStateOf<Job?>(null) }
     val curMode by rememberUpdatedState(mode)
     val curSens by rememberUpdatedState(sens)
