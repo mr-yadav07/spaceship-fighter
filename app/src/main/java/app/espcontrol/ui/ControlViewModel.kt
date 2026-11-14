@@ -234,6 +234,13 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         msg(if (isRgb) "RGB: all deselected" else "Switches: all deselected")
     }
 
+    fun setSelectedSwitches(on: Boolean) {
+        val sel = selected(false)
+        if (sel.isEmpty()) { msg("Switches: none selected"); return }
+        for (it in sel) if (ui.value.demo) demoUpdate(it.key) { x -> x.copy(on = on) } else hub.setOnOff(it.devId, it.out, on)
+        msg("Switches ${if (on) "ON" else "OFF"} · ${sel.size}")
+    }
+
     fun powerSwitches() {
         val sel = selected(false)
         if (sel.isEmpty()) { msg("Switches: none selected"); return }
