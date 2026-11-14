@@ -171,7 +171,7 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
                             }
                         }
                         lock.withLock {
-                            if(!ok) l.lastError="BLE write failed · latest target retained for the next update"
+                            if(!ok) l.lastError="BLE write failed · check connection and retry"
                             else l.lastError=null
                             publish()
                         }
