@@ -420,13 +420,13 @@ private fun ScanPanel(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
     val scanStatus by vm.scanStatus.collectAsState()
     Box(Modifier.fillMaxSize()) {
         Column(
-            Modifier.offset(84.dp, (190 - (s.devices.size.coerceAtMost(5) * 10)).coerceAtLeast(150).dp).width(258.dp)
+            Modifier.offset(84.dp, (780 - (s.devices.size * 56 + 92)).coerceAtMost(190).coerceAtLeast(150).dp).width(258.dp)
                 .clip(RoundedCornerShape(26.dp)).background(C.Card).border(1.dp, C.Line, RoundedCornerShape(26.dp))
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             T(if (s.demo) "Devices · DEMO DATA ON" else "Devices · BLE", 16f, weight = FontWeight.SemiBold)
-            LazyColumn(Modifier.height((s.devices.size.coerceAtMost(5) * 56).coerceAtLeast(56).dp)) {
+            LazyColumn(Modifier.height((s.devices.size * 56).coerceAtLeast(56).dp)) {
                 items(s.devices) { d -> DeviceRow(d, vm) }
                 if (s.devices.isEmpty()) item { T(scanStatus, 12f, C.Muted) }
             }
@@ -440,7 +440,7 @@ private fun ScanPanel(s: UiState, vm: ControlViewModel, onClose: () -> Unit) {
 
 @Composable
 private fun DeviceRow(d: DeviceInfo, vm: ControlViewModel) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             T(d.name, 14f, weight = FontWeight.Medium)
             val routes = d.availableRoutes.joinToString(" · ") { r -> when (r) { RouteKind.LOCAL_UDP -> "WiFi"; RouteKind.BLE -> "BLE"; RouteKind.RELAY_UDP -> "Internet" } }
