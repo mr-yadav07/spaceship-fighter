@@ -50,7 +50,7 @@ static const Candidate CANDIDATES[]={
 @CANDIDATES@
 };
 static const Effect EFFECTS[]={{1,"Rainbow"},{2,"Pulse"},{3,"Color Cycle"},{4,"Chase"}};
-struct State{uint8_t r=255,g=0,b=0,brightness=255,effect=0,speed=128;bool on=true,switchOn=false;Adafruit_NeoPixel* strip=nullptr;};
+struct State{uint8_t r=255,g=0,b=0,brightness=255,effect=0,speed=128;bool on=true,switchOn=false;float fr=255,fg=0,fb=0;bool fadeReady=false;Adafruit_NeoPixel* strip=nullptr;};
 static State states[sizeof(CANDIDATES)/sizeof(CANDIDATES[0])];
 static NimBLECharacteristic* eventChar=nullptr;
 static std::vector<uint8_t> pending;
@@ -97,14 +97,15 @@ static void applyQueued(){
  while(true){Cmd c{};{std::lock_guard<std::mutex>g(queueMutex);if(queue.empty())return;c=queue.front();queue.erase(queue.begin());}
  uint8_t kind=c.kind;int ix=indexOf(kind,c.id);if(ix<0)return;State&s=states[ix];const Candidate&cfg=CANDIDATES[ix];
  if(kind==SWITCH_KIND){s.switchOn=c.a;digitalWrite(cfg.pin,s.switchOn?HIGH:LOW);}
- else if(kind==RGB_KIND){s.r=c.a;s.g=c.b;s.b=c.c;s.brightness=c.br;s.on=c.on;s.effect=0;if(s.strip){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
+ else if(kind==RGB_KIND){s.r=c.a;s.g=c.b;s.b=c.c;s.brightness=c.br;s.on=c.on;s.effect=0;if(s.strip && !s.fadeReady){s.fr=s.r;s.fg=s.g;s.fb=s.b;s.fadeReady=true;}}
  else{s.effect=c.a;s.speed=c.b;if(s.strip && c.a==0){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
  queueState(kind,c.id);
  }
 }
 static void runEffects(){
  static uint32_t last=0;if(millis()-last<20)return;last=millis();
- for(size_t i=0;i<sizeof(CANDIDATES)/sizeof(CANDIDATES[0]);i++){if(CANDIDATES[i].kind!=RGB_KIND||!states[i].effect||!states[i].strip)continue;State&s=states[i];auto&strip=*s.strip;
+ for(size_t i=0;i<sizeof(CANDIDATES)/sizeof(CANDIDATES[0]);i++){if(CANDIDATES[i].kind!=RGB_KIND||!states[i].strip)continue;State&s=states[i];auto&strip=*s.strip;
+ if(s.effect==0){if(!s.fadeReady){s.fr=s.r;s.fg=s.g;s.fb=s.b;s.fadeReady=true;}s.fr+=(s.r-s.fr)*0.22f;s.fg+=(s.g-s.fg)*0.22f;s.fb+=(s.b-s.fb)*0.22f;uint8_t r=(uint8_t)(s.fr+0.5f),g=(uint8_t)(s.fg+0.5f),b=(uint8_t)(s.fb+0.5f);strip.fill(s.on?strip.Color(r,g,b):0);strip.setBrightness(s.brightness);strip.show();continue;}
  if(s.effect==1){for(uint16_t j=0;j<CANDIDATES[i].leds;j++)strip.setPixelColor(j,strip.ColorHSV((uint16_t)(millis()*s.speed+j*65535/CANDIDATES[i].leds)));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==2){uint8_t v=(std::sin(millis()/500.0)+1)*127;strip.fill(strip.Color(s.r*v/255,s.g*v/255,s.b*v/255));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==3){strip.fill(strip.Color((millis()/8)%255,(millis()/8+85)%255,(millis()/8+170)%255));strip.setBrightness(s.brightness);strip.show();}
