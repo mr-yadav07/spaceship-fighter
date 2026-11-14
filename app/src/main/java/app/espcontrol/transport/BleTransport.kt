@@ -12,7 +12,6 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
@@ -22,7 +21,6 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.ParcelUuid
 import app.espcontrol.core.RouteKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,8 +37,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * BLE route. Devices advertise the control service and a local name "ESPC-<12 hex MAC>".
- * Packets use exactly the same ESPCTL format as UDP: written to the COMMAND characteristic
- * (write without response) and received as notifications on the EVENTS characteristic.
+ * Protocol v2 frames are written to COMMAND and received on EVENTS notifications.
  */
 @SuppressLint("MissingPermission")
 class BleTransport(private val ctx: Context) : Transport {
