@@ -11,6 +11,7 @@ object ProtocolV2 {
     const val SWITCH_SET = 0x10
     const val RGB_SET = 0x11
     const val EFFECT_SET = 0x12
+    const val RGB_TRANSITION = 0x13
     const val UPDATE = 0x20
     const val STATUS_REQUEST = 0x21
     const val STATUS = 0x22
@@ -95,6 +96,14 @@ object ProtocolV2 {
     fun effects(values: List<EffectCommand>) = byteArrayOf(values.size.toByte()) +
         values.flatMap { listOf(it.id.toByte(),it.effectId.toByte(),it.speed.toByte()) }.toByteArray()
 
+    /** Target state plus local transition duration and common start delay. */
+    fun rgbTransitions(values: List<RgbTransitionCommand>) = byteArrayOf(values.size.toByte()) +
+        values.flatMap {
+            listOf(it.id,it.r,it.g,it.b,it.brightness,if(it.on) 1 else 0,
+                it.durationMs and 255,(it.durationMs ushr 8) and 255,
+                it.startDelayMs and 255,(it.startDelayMs ushr 8) and 255).map(Int::toByte)
+        }.toByteArray()
+
     data class RgbCommand(val id:Int,val r:Int,val g:Int,val b:Int,val brightness:Int,val on:Boolean)
-    data class EffectCommand(val id:Int,val effectId:Int,val speed:Int)
+    data class EffectCommand(val id:Int,val effectId:Int,val speed:Int)\n    data class RgbTransitionCommand(val id:Int,val r:Int,val g:Int,val b:Int,val brightness:Int,val on:Boolean,val durationMs:Int=180,val startDelayMs:Int=60)
 }
