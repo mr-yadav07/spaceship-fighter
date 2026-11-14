@@ -47,7 +47,7 @@ import app.espcontrol.core.LinkState
 import app.espcontrol.core.RouteKind
 
 private enum class Panel { NONE, SETTINGS, SCAN, RGB, SWITCH, MENU }
-private enum class Sheet { NONE, UI, THEME, SWITCH, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
+private enum class Sheet { NONE, UI, DEVICES, SECURITY, SCROLL, CONNECTION, EFFECTS, FIRMWARE }
 
 @Composable
 fun MainScreen(vm: ControlViewModel) {
@@ -114,7 +114,7 @@ fun MainScreen(vm: ControlViewModel) {
         ActionRow(18.dp, 722.dp, "Switches", { vm.syncSwitches(centerSw) }, { vm.dselect(false) }, { vm.powerSwitches() })
         }
 
-        if (panel != Panel.NONE) {
+        if (panel != Panel.NONE || infoOpen) {
             Box(
                 Modifier.fillMaxSize().background(Color(0x8C0A0B10))
                     .clickable { panel = Panel.NONE; sheet = Sheet.NONE; infoOpen = false },
@@ -137,8 +137,6 @@ fun MainScreen(vm: ControlViewModel) {
         AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             when (sheet) {
                 Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
-                Sheet.THEME -> ThemeSheet(s, vm) { sheet = Sheet.NONE }
-                Sheet.SWITCH -> SwitchConfigSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.DEVICES -> DevicesSheet(s, vm) { sheet = Sheet.NONE }
                 Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
                 Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
@@ -303,7 +301,7 @@ private fun ListRevolver(
 
 @Composable
 private fun SettingsRevolver(vm: ControlViewModel, s: UiState, ui: Int, openSheet: (Sheet) -> Unit) {
-    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.THEME, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.SWITCH, "Scroll" to Sheet.SCROLL)
+    val items = listOf("UI" to Sheet.UI, "Theme" to Sheet.NONE, "Effects" to Sheet.EFFECTS, "Switch" to Sheet.NONE, "Scroll" to Sheet.SCROLL)
     Revolver(
         items = items.map { (name, _) -> RevItem(name, sel = false, on = false, dot = null) },
         mode = s.mode, sens = s.sens[s.mode] ?: 0, ui = ui, finite = true,
