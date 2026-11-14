@@ -69,13 +69,13 @@ private data class RevGeometry(
 ) {
     val spacing = b * step
 }
-private fun geometry(ui: Int): RevGeometry = if (ui == 2) {
-    RevGeometry(90f, 90f, 0.44f, 124f, 38f, 30f, 88f, 12f, 160f, 252f, 460f, 310f)
+private fun geometry(ui: Int, finite: Boolean): RevGeometry = if (ui == 2) {
+    RevGeometry(90f, 90f, if (finite) 0.5f else 0.44f, 124f, 38f, 30f, 88f, 12f, 160f, 252f, 460f, 310f)
 } else {
-    RevGeometry(92f, 260f, 0.185f, 142f, 40f, 34f, 100f, 13f, 140f, 122f, 500f, 570f)
+    RevGeometry(92f, 260f, if (finite) 0.32f else 0.185f, 142f, 40f, 34f, 100f, 13f, 140f, 122f, 500f, 570f)
 }
 private fun slots(n: Int, rot: Float, ui: Int, finite: Boolean): List<Slot> {
-    val g = geometry(ui)
+    val g = geometry(ui, finite)
     return (0 until n).map { i ->
         var d = if (finite) i - rot else (((i - rot) % n) + n) % n
         if (!finite && d > n / 2f) d -= n
@@ -119,7 +119,7 @@ fun Revolver(
     onName: (Int) -> Unit, onToggle: (Int) -> Unit,
 ) {
     val n = items.size
-    val g = geometry(ui)
+    val g = geometry(ui, finite)
     val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
     val rotState = rotationState ?: remember { mutableFloatStateOf(0f) }
@@ -168,7 +168,7 @@ fun Revolver(
     }
 
     fun tap(xDp: Float, yDp: Float) {
-        val gg = geometry(curUi)
+        val gg = geometry(curUi, curFinite)
         val x = gg.panLeft + xDp
         val y = gg.panTop + yDp
         var best: Slot? = null
