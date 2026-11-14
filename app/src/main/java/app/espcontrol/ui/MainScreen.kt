@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -80,7 +81,7 @@ fun MainScreen(vm: ControlViewModel) {
     ) {
         val canvasScale = minOf(1f, maxWidth / 390.dp, maxHeight / 844.dp)
         Box(
-            Modifier.size(390.dp, 844.dp).graphicsLayer {
+            Modifier.requiredSize(390.dp, 844.dp).graphicsLayer {
                 scaleX = canvasScale
                 scaleY = canvasScale
             }
