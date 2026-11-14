@@ -224,8 +224,8 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
             val old=l.rgb[out] ?: RgbState()
             val next=change(old)
             l.rgb[out]=next
-            val p=ProtocolV2.rgbs(listOf(ProtocolV2.RgbCommand(out,next.r,next.g,next.b,next.brightness,next.on)))
-            queue(l,"rgb:$out",byteArrayOf(ProtocolV2.RGB_SET.toByte())+p)
+            val p=ProtocolV2.rgbTransitions(listOf(ProtocolV2.RgbTransitionCommand(out,next.r,next.g,next.b,next.brightness,next.on)))
+            queue(l,"rgb-batch",byteArrayOf(ProtocolV2.RGB_TRANSITION.toByte())+p)
             publish()
         }
     } }
