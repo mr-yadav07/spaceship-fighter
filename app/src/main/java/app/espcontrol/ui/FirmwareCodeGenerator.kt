@@ -85,7 +85,8 @@ static Cmd commandQueue[32];
 static uint8_t queueCount=0;
 static portMUX_TYPE queueMux = portMUX_INITIALIZER_UNLOCKED;
 static std::vector<uint8_t> pendingFeedback;
-static uint32_t feedbackDue=0;\nstatic uint32_t lastTransitionFrame=0;
+static uint32_t feedbackDue=0;
+static uint32_t lastTransitionFrame=0;
 
 static uint16_t rd16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
 static int indexOf(uint8_t kind, uint8_t id) {
@@ -278,6 +279,8 @@ static void applyQueued() {
 }
 static void runTransitions() {
   uint32_t now=millis();
+  if (now-lastTransitionFrame<16) return;
+  lastTransitionFrame=now;
   for (size_t i=0;i<CANDIDATE_COUNT;i++) {
     if (CANDIDATES[i].kind==RGB_KIND) updateTransition(states[i],CANDIDATES[i],now);
   }
