@@ -24,6 +24,8 @@ import android.os.Build
 import app.espcontrol.core.RouteKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +67,7 @@ class BleTransport(private val ctx: Context) : Transport {
 
     private class Conn(val gatt: BluetoothGatt) {
         val writeLock = Mutex()
+        @Volatile var pendingWrite: CompletableDeferred<Boolean>? = null
         @Volatile var cmd: BluetoothGattCharacteristic? = null
         @Volatile var ready = false
         @Volatile var mtu = 23
@@ -295,6 +298,12 @@ class BleTransport(private val ctx: Context) : Transport {
             publishReady()
         }
 
+        override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            conns[g.device.address]?.pendingWrite?.let { deferred ->
+                deferred.complete(status == BluetoothGatt.GATT_SUCCESS)
+            }
+        }
+
         // API 33+
         override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray) {
             flow.tryEmit(Rx(kind, value, g.device.address))
@@ -319,18 +328,28 @@ class BleTransport(private val ctx: Context) : Transport {
     }
 
     @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION")
     suspend fun send(address: String, bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
         val c = conns[address] ?: return@withContext false
         c.writeLock.withLock {
             val ch = c.cmd
             if (!c.ready || ch == null || bytes.size > c.mtu - 3) return@withLock false
-            if (Build.VERSION.SDK_INT >= 33) {
-                c.gatt.writeCharacteristic(ch, bytes, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) == BluetoothStatusCodes.SUCCESS
+            val completion = CompletableDeferred<Boolean>()
+            c.pendingWrite = completion
+            val accepted = if (Build.VERSION.SDK_INT >= 33) {
+                c.gatt.writeCharacteristic(ch, bytes, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
             } else {
-                ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                ch.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 ch.value = bytes
                 c.gatt.writeCharacteristic(ch)
             }
+            if (!accepted) {
+                c.pendingWrite = null
+                return@withLock false
+            }
+            val result = withTimeoutOrNull(1500L) { completion.await() } ?: false
+            c.pendingWrite = null
+            result
         }
     }
 
