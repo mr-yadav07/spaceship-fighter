@@ -25,8 +25,8 @@ object FirmwareCodeGenerator {
             val id = candidate.id.toInt()
             val pin = candidate.gpio.toInt()
             val name = candidate.name.filter { it.isLetterOrDigit() || it == '_' || it == '-' || it == ' ' }
-                .take(24).ifBlank { "\${candidate.type} $id" }
-            if (candidate.type == "RGB") "  {RGB_KIND, $id, $pin, \${candidate.leds.toInt()}, \"$name\"}"
+                .take(24).ifBlank { "${candidate.type} $id" }
+            if (candidate.type == "RGB") "  {RGB_KIND, $id, $pin, ${candidate.leds.toInt()}, \"$name\"}"
             else "  {SWITCH_KIND, $id, $pin, 0, \"$name\"}"
         }
         return SOURCE.replace("@DEVICE@", safeName).replace("@CANDIDATES@", rows)
