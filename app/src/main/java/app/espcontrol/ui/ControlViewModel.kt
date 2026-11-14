@@ -132,56 +132,74 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- colour / brightness / power
 
-    private fun pushColor() {
-        val s = ui.value
-        val targets = selected(true)
-        if (s.demo) {
-            targets.forEach { item -> demoUpdate(item.key) { x -> x.copy(color = Color(s.effR, s.effG, s.effB)) } }
+    private fun selectedRgb(state: Local = local.value): List<OutItem> =
+        ui.value.rgbItems.filter { it.key in state.selRgb }
+
+    private fun pushColor(state: Local = local.value) {
+        val targets = selectedRgb(state)
+        val rr = if (state.enR) state.r else 0
+        val gg = if (state.enG) state.g else 0
+        val bb = if (state.enB) state.b else 0
+        if (state.demo) {
+            targets.forEach { item -> demoUpdate(item.key) { x -> x.copy(color = Color(rr, gg, bb)) } }
         } else {
-            val group=targets.groupBy { it.devId }.mapValues { (_,outputs) ->
+            val group = targets.groupBy { it.devId }.mapValues { (_, outputs) ->
                 outputs.map { item ->
-                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,s.effR,s.effG,s.effB,s.br,item.on)
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,rr,gg,bb,state.br,item.on)
                 }
             }
-            if(group.isNotEmpty()) hub.setRgbGroup(group)
+            if (group.isNotEmpty()) hub.setRgbGroup(group)
         }
     }
 
-    fun setColor(r: Int, g: Int, b: Int) { local.update { it.copy(r = r, g = g, b = b) }; pushColor() }
+    fun setColor(r: Int, g: Int, b: Int) { local.update { it.copy(r = r, g = g, b = b) }; pushColor(local.value) }
     fun setChannel(ch: Int, v: Int) {
         local.update { when (ch) { 0 -> it.copy(r = v); 1 -> it.copy(g = v); else -> it.copy(b = v) } }
-        pushColor()
+        pushColor(local.value)
     }
     fun toggleChannel(ch: Int) {
         local.update { when (ch) { 0 -> it.copy(enR = !it.enR); 1 -> it.copy(enG = !it.enG); else -> it.copy(enB = !it.enB) } }
-        pushColor()
+        pushColor(local.value)
     }
 
     fun setBrightness(v: Int) {
         local.update { it.copy(br = v) }
-        val demo = ui.value.demo
-        if (!demo) {
-            val group=selected(true).groupBy { it.devId }.mapValues { (_,outputs) ->
+        val state = local.value
+        if (!state.demo) {
+            val group = selectedRgb(state).groupBy { it.devId }.mapValues { (_, outputs) ->
                 outputs.map { item ->
-                    val state=ui.value.devices.firstOrNull { it.id==item.devId }?.rgbStates?.get(item.out)
-                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,state?.r ?: ui.value.effR,state?.g ?: ui.value.effG,state?.b ?: ui.value.effB,v,item.on)
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(
+                        item.out,
+                        if (state.enR) state.r else 0,
+                        if (state.enG) state.g else 0,
+                        if (state.enB) state.b else 0,
+                        v,
+                        item.on,
+                    )
                 }
             }
-            if(group.isNotEmpty()) hub.setRgbGroup(group)
+            if (group.isNotEmpty()) hub.setRgbGroup(group)
         }
     }
 
     fun togglePower() {
-        val sel = selected(true)
+        val state = local.value
+        val sel = selectedRgb(state)
         if (sel.isEmpty()) { msg("RGB: no device selected"); return }
         val target = !sel.any { it.on }
-        if (ui.value.demo) {
+        if (state.demo) {
             sel.forEach { item -> demoUpdate(item.key) { x -> x.copy(on = target) } }
         } else {
-            val group=sel.groupBy { it.devId }.mapValues { (_,outputs) ->
+            val group = sel.groupBy { it.devId }.mapValues { (_, outputs) ->
                 outputs.map { item ->
-                    val state=ui.value.devices.firstOrNull { it.id==item.devId }?.rgbStates?.get(item.out)
-                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,state?.r ?: ui.value.effR,state?.g ?: ui.value.effG,state?.b ?: ui.value.effB,state?.brightness ?: ui.value.br,target)
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(
+                        item.out,
+                        if (state.enR) state.r else 0,
+                        if (state.enG) state.g else 0,
+                        if (state.enB) state.b else 0,
+                        state.br,
+                        target,
+                    )
                 }
             }
             hub.setRgbGroup(group)
@@ -190,9 +208,9 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun syncRgb() {
-        val n = selected(true).size
+        val n = selectedRgb().size
         if (n == 0) { msg("Sync: no RGB selected"); return }
-        pushColor()
+        pushColor(local.value)
         msg("Synced colour to $n outputs")
     }
 
