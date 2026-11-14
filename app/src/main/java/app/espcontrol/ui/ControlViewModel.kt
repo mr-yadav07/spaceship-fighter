@@ -138,11 +138,12 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         if (s.demo) {
             targets.forEach { item -> demoUpdate(item.key) { x -> x.copy(color = Color(s.effR, s.effG, s.effB)) } }
         } else {
-            targets.groupBy { it.devId }.forEach { (deviceId, outputs) ->
-                hub.setRgbs(deviceId, outputs.map { item ->
+            val group=targets.groupBy { it.devId }.mapValues { (_,outputs) ->
+                outputs.map { item ->
                     app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,s.effR,s.effG,s.effB,s.br,item.on)
-                })
+                }
             }
+            if(group.isNotEmpty()) hub.setRgbGroup(group)
         }
     }
 
@@ -158,12 +159,15 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBrightness(v: Int) {
         local.update { it.copy(br = v) }
-        val s = ui.value
-        val targets = selected(true)
-        if (!s.demo) targets.groupBy { it.devId }.forEach { (deviceId, outputs) ->
-            hub.setRgbs(deviceId, outputs.map { item ->
-                app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,item.color.red.toInt().coerceIn(0,255),item.color.green.toInt().coerceIn(0,255),item.color.blue.toInt().coerceIn(0,255),v,item.on)
-            })
+        val demo = ui.value.demo
+        if (!demo) {
+            val group=selected(true).groupBy { it.devId }.mapValues { (_,outputs) ->
+                outputs.map { item ->
+                    val state=ui.value.devices.firstOrNull { it.id==item.devId }?.rgbStates?.get(item.out)
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,state?.r ?: ui.value.effR,state?.g ?: ui.value.effG,state?.b ?: ui.value.effB,v,item.on)
+                }
+            }
+            if(group.isNotEmpty()) hub.setRgbGroup(group)
         }
     }
 
