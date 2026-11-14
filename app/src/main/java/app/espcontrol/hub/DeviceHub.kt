@@ -59,6 +59,17 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
         scope.launch {
             launch { ble.incoming.collect { onRx(it) } }
             launch { ble.adverts.collect { onAdvert(it) } }
+            launch { ble.errors.collect { (address, message) ->
+                lock.withLock {
+                    links.values.firstOrNull { it.address.equals(address, ignoreCase = true) }?.let { link ->
+                        if (link.state == LinkState.CONNECTING) {
+                            link.state = LinkState.OFFLINE
+                            link.lastError = message
+                            publish()
+                        }
+                    }
+                }
+            } }
             launch { ble.ready.collect { ready ->
                 lock.withLock {
                     links.values.forEach { l ->
