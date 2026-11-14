@@ -157,8 +157,8 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             T("INFORMATION", 11f, C.Muted, FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(C.Green))
-                T("LIVE", 11f, C.Green, FontWeight.SemiBold)
+                Box(Modifier.size(7.dp).clip(CircleShape).background(if (s.demo) C.Orange else C.Green))
+                T(if (s.demo) "DEMO" else "LIVE", 11f, if (s.demo) C.Orange else C.Green, FontWeight.SemiBold)
             }
         }
         Spacer(Modifier.height(6.dp))
