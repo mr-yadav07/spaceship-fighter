@@ -10,17 +10,17 @@ data class FirmwareCandidate(
 
 object FirmwareCodeGenerator {
     fun generate(deviceName: String, candidates: List<FirmwareCandidate>): String {
-        val valid = candidates.isNotEmpty() && candidates.all {
+        val valid = candidates.isNotEmpty() && candidates.size <= 12 && candidates.map { it.gpio.toIntOrNull() }.distinct().size == candidates.size && candidates.all {
             val id=it.id.toIntOrNull(); val pin=it.gpio.toIntOrNull()
-            id!=null && id in 0..255 && pin!=null && pin in 0..48 &&
+            id!=null && id in 0..255 && pin!=null && pin in 0..39 &&
                 (it.type=="SWITCH" || (it.type=="RGB" && it.leds.toIntOrNull()?.let { n -> n in 1..65535 } == true))
         } && candidates.map { it.type to it.id }.distinct().size==candidates.size
-        require(valid) { "Candidate IDs, GPIO pins or LED counts are invalid or duplicated." }
-        val safeName=deviceName.replace("\\","").replace("\"","").take(32).ifBlank { "ESP32" }
+        require(valid) { "Use 1–12 candidates, unique IDs per type and GPIO pins (0–39), and RGB LED counts from 1–65535." }
+        val safeName=deviceName.replace("\\","").replace("\"","").replace("\n"," ").replace("\r"," ").take(32).ifBlank { "ESP32" }
         val rows=candidates.joinToString(",\n") { c ->
             val id=c.id.toInt()
             val pin=c.gpio.toInt()
-            val name=(c.name.ifBlank { "${c.type} $id" }).replace("\\","").replace("\"","").take(24)
+            val name=(c.name.ifBlank { "${c.type} $id" }).replace("\\","").replace("\"","").replace("\n"," ").replace("\r"," ").take(24)
             if(c.type=="RGB") "  {RGB_KIND, $id, $pin, ${c.leds.toInt()}, \"$name\"}"
             else "  {SWITCH_KIND, $id, $pin, 0, \"$name\"}"
         }
@@ -35,6 +35,7 @@ object FirmwareCodeGenerator {
 #include <Adafruit_NeoPixel.h>
 #include <vector>
 #include <mutex>
+#include <cmath>
 
 static const char DEVICE_NAME[]="@DEVICE@";
 static constexpr char SERVICE_UUID[]="a6c60001-6b9f-4d8e-a251-5bd248e8c101";
@@ -93,18 +94,19 @@ static void onCommand(const uint8_t*d,size_t n){
 }
 class Callbacks:public NimBLECharacteristicCallbacks{void onWrite(NimBLECharacteristic*c,NimBLEConnInfo&)override{auto v=c->getValue();onCommand((const uint8_t*)v.data(),v.size());}};
 static void applyQueued(){
- Cmd c{};{std::lock_guard<std::mutex>g(queueMutex);if(queue.empty())return;c=queue.front();queue.erase(queue.begin());}
+ while(true){Cmd c{};{std::lock_guard<std::mutex>g(queueMutex);if(queue.empty())return;c=queue.front();queue.erase(queue.begin());}
  uint8_t kind=c.kind;int ix=indexOf(kind,c.id);if(ix<0)return;State&s=states[ix];const Candidate&cfg=CANDIDATES[ix];
  if(kind==SWITCH_KIND){s.switchOn=c.a;digitalWrite(cfg.pin,s.switchOn?HIGH:LOW);}
  else if(kind==RGB_KIND){s.r=c.a;s.g=c.b;s.b=c.c;s.brightness=c.br;s.on=c.on;if(s.strip){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
- else{s.effect=c.a;s.speed=c.b;}
+ else{s.effect=c.a;s.speed=c.b;if(s.strip && c.a==0){for(uint16_t j=0;j<cfg.leds;j++)s.strip->setPixelColor(j,s.on?s.strip->Color(s.r,s.g,s.b):0);s.strip->setBrightness(s.brightness);s.strip->show();}}
  queueState(kind,c.id);
+ }
 }
 static void runEffects(){
  static uint32_t last=0;if(millis()-last<20)return;last=millis();
  for(size_t i=0;i<sizeof(CANDIDATES)/sizeof(CANDIDATES[0]);i++){if(CANDIDATES[i].kind!=RGB_KIND||!states[i].effect||!states[i].strip)continue;State&s=states[i];auto&strip=*s.strip;
  if(s.effect==1){for(uint16_t j=0;j<CANDIDATES[i].leds;j++)strip.setPixelColor(j,strip.ColorHSV((uint16_t)(millis()*s.speed+j*65535/CANDIDATES[i].leds)));strip.setBrightness(s.brightness);strip.show();}
- else if(s.effect==2){uint8_t v=(sin(millis()/500.0)+1)*127;strip.fill(strip.Color(s.r*v/255,s.g*v/255,s.b*v/255));strip.setBrightness(s.brightness);strip.show();}
+ else if(s.effect==2){uint8_t v=(std::sin(millis()/500.0)+1)*127;strip.fill(strip.Color(s.r*v/255,s.g*v/255,s.b*v/255));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==3){strip.fill(strip.Color((millis()/8)%255,(millis()/8+85)%255,(millis()/8+170)%255));strip.setBrightness(s.brightness);strip.show();}
  else if(s.effect==4){strip.clear();strip.setPixelColor((millis()/max(1,(int)(255-s.speed)))%CANDIDATES[i].leds,strip.Color(s.r,s.g,s.b));strip.setBrightness(s.brightness);strip.show();}
  }
