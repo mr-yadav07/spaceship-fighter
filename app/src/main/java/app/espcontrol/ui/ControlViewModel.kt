@@ -81,9 +81,18 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- state building
 
     private fun demoItems(rgb: Boolean): List<OutItem> {
-        val names = if (rgb) listOf("RGB Lamp", "RGB LED", "RGB 2", "Strip 4", "Bed LED") else listOf("LED 7", "LED 3", "OK 4", "Fan 2", "Door 3")
-        return names.mapIndexed { i, n ->
-            OutItem((if (rgb) "demoR" else "demoS") + i, "demo", i, n, rgb && i < 3 || !rgb && i == 2, Color(240, 93, 255), rgb)
+        val prefixes = if (rgb) listOf("RGB Lamp", "RGB Strip", "Desk LED", "Bed LED", "Room RGB", "Accent") else listOf("LED", "Relay", "Fan", "Door", "Pump", "Switch")
+        return (0 until 26).map { i ->
+            val name = "${prefixes[i % prefixes.size]} ${i + 1}"
+            OutItem(
+                (if (rgb) "demoR" else "demoS") + i,
+                "demo",
+                i,
+                name,
+                if (rgb) i < 3 else i == 2,
+                Color(240, 93, 255),
+                rgb,
+            )
         }
     }
 
