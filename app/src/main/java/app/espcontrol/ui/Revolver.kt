@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -134,6 +135,14 @@ fun Revolver(
         }
     }
 
+    fun stepBy(delta: Float) {
+        motion?.cancel()
+        motion = scope.launch {
+            val target = (rot + delta).let { if (curFinite) it.coerceIn(0f, (curN - 1).coerceAtLeast(0).toFloat()) else it }
+            animate(initialValue = rot, targetValue = target, animationSpec = tween(260)) { v, _ -> rot = v }
+        }
+    }
+
     fun fling(v0: Float, sensF: Float) {
         motion?.cancel()
         motion = scope.launch {
@@ -233,6 +242,8 @@ fun Revolver(
             },
         )
         Box(Modifier.offset((390f - g.r).dp, (CY - g.b).dp).size((g.r * 2).dp, (g.b * 2).dp).border(1.dp, Color(0x24FFFFFF), CircleShape))
+        RevolverArrow(Modifier.offset(334.dp, (CY - 150f).dp), up = true) { stepBy(-1f) }
+        RevolverArrow(Modifier.offset(334.dp, (CY + 116f).dp), up = false) { stepBy(1f) }
         for (s in slots(n, rot, ui, finite)) {
             if (!s.vis) continue
             val item = items.getOrNull(s.i) ?: continue
@@ -260,6 +271,31 @@ fun Revolver(
                     ) { T(if (item.on) "ON" else "OFF", 11f, if (item.on) Color(0xFF0E0F14) else C.Muted, FontWeight.SemiBold) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RevolverArrow(modifier: Modifier = Modifier, up: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier.size(34.dp).clip(CircleShape)
+            .background(Color(0xDB1E212D))
+            .border(1.dp, Color(0x24FFFFFF), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(18.dp)) {
+            val p = androidx.compose.ui.graphics.Path()
+            if (up) {
+                p.moveTo(size.width * 0.2f, size.height * 0.65f)
+                p.lineTo(size.width * 0.5f, size.height * 0.35f)
+                p.lineTo(size.width * 0.8f, size.height * 0.65f)
+            } else {
+                p.moveTo(size.width * 0.2f, size.height * 0.35f)
+                p.lineTo(size.width * 0.5f, size.height * 0.65f)
+                p.lineTo(size.width * 0.8f, size.height * 0.35f)
+            }
+            drawPath(p, Color(0xFFF2F3F7), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(), cap = StrokeCap.Round))
         }
     }
 }
