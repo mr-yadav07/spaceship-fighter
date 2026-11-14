@@ -175,7 +175,17 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         val sel = selected(true)
         if (sel.isEmpty()) { msg("RGB: no device selected"); return }
         val target = !sel.any { it.on }
-        for (it in sel) if (ui.value.demo) demoUpdate(it.key) { x -> x.copy(on = target) } else hub.setPower(it.devId, it.out, target)
+        if (ui.value.demo) {
+            sel.forEach { item -> demoUpdate(item.key) { x -> x.copy(on = target) } }
+        } else {
+            val group=sel.groupBy { it.devId }.mapValues { (_,outputs) ->
+                outputs.map { item ->
+                    val state=ui.value.devices.firstOrNull { it.id==item.devId }?.rgbStates?.get(item.out)
+                    app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out,state?.r ?: ui.value.effR,state?.g ?: ui.value.effG,state?.b ?: ui.value.effB,state?.brightness ?: ui.value.br,target)
+                }
+            }
+            hub.setRgbGroup(group)
+        }
         msg("RGB ${if (target) "ON" else "OFF"} · ${sel.size} outputs")
     }
 
