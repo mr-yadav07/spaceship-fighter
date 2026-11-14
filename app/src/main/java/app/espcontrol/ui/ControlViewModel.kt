@@ -193,8 +193,6 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         val n = selected(true).size
         if (n == 0) { msg("Sync: no RGB selected"); return }
         pushColor()
-        val s = ui.value
-        if (!s.demo) for (it in selected(true)) hub.setBrightness(it.devId, it.out, s.br)
         msg("Synced colour to $n outputs")
     }
 
