@@ -40,6 +40,7 @@ object FirmwareCodeGenerator {
 #include <Adafruit_NeoPixel.h>
 #include <vector>
 #include <cstring>
+#include <string>
 #include <cmath>
 
 static const char DEVICE_NAME[] = "@DEVICE@";
