@@ -42,7 +42,7 @@ static constexpr char SERVICE_UUID[]="a6c60001-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr char COMMAND_UUID[]="a6c60002-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr char EVENTS_UUID[]="a6c60003-6b9f-4d8e-a251-5bd248e8c101";
 static constexpr uint8_t MAGIC0=0xEC,MAGIC1=0x53,VERSION=2;
-enum:uint8_t{CAPS_REQUEST=1,CAPS=2,SWITCH_SET=16,RGB_SET=17,EFFECT_SET=18,UPDATE=32,STATUS_REQUEST=33,STATUS_MSG=34};
+enum:uint8_t{CAPS_REQUEST=1,CAPS=2,SWITCH_SET=16,RGB_SET=17,EFFECT_SET=18,RGB_TRANSITION=19,UPDATE=32,STATUS_REQUEST=33,STATUS_MSG=34};
 enum:uint8_t{SWITCH_KIND=1,RGB_KIND=2,EFFECT_KIND=3};
 struct Candidate{uint8_t kind,id;uint8_t pin;uint16_t leds;const char*name;};
 struct Effect{uint8_t id;const char*name;};
@@ -55,21 +55,21 @@ static State states[sizeof(CANDIDATES)/sizeof(CANDIDATES[0])];
 static NimBLECharacteristic* eventChar=nullptr;
 static std::vector<uint8_t> pending;
 static uint32_t feedbackDue=0;
-struct Cmd{uint8_t kind,id,a,b,c,br,on;};
+struct Cmd{uint8_t kind,id,a,b,c,br,on;uint16_t duration=0,startDelay=0;bool transition=false;};
 static std::vector<Cmd> queue;
 static std::mutex queueMutex;
 static int indexOf(uint8_t kind,uint8_t id){for(size_t i=0;i<sizeof(CANDIDATES)/sizeof(CANDIDATES[0]);i++)if(CANDIDATES[i].kind==kind&&CANDIDATES[i].id==id)return (int)i;return -1;}
 static bool hasEffect(uint8_t id){if(!id)return true;for(auto&e:EFFECTS)if(e.id==id)return true;return false;}
 static uint16_t rd16(const uint8_t*p){return uint16_t(p[0])|(uint16_t(p[1])<<8);}
 static void sendFrame(uint8_t type,const std::vector<uint8_t>&p){if(!eventChar||p.size()>508)return;std::vector<uint8_t>f={MAGIC0,MAGIC1,VERSION,type,uint8_t(p.size()),uint8_t(p.size()>>8)};f.insert(f.end(),p.begin(),p.end());eventChar->setValue(f.data(),f.size());eventChar->notify();}
-static void queueState(uint8_t kind,uint8_t id){
+static void queueState(uint8_t kind,uint8_t id,bool immediate=false){
  int ix=indexOf(kind==EFFECT_KIND?RGB_KIND:kind,id);if(ix<0)return;
  size_t pos=0;while(pos<pending.size()){uint8_t k=pending[pos];size_t n=k==SWITCH_KIND?3:(k==RGB_KIND?7:4);if(pos+n>pending.size()){pending.clear();break;}if(k==kind&&pending[pos+1]==id){pending.erase(pending.begin()+pos,pending.begin()+pos+n);break;}pos+=n;}
  State&s=states[ix];std::vector<uint8_t>e={kind,id};
  if(kind==SWITCH_KIND)e.push_back(s.switchOn?1:0);
  else if(kind==RGB_KIND)e.insert(e.end(),{s.r,s.g,s.b,s.brightness,uint8_t(s.on)});
  else e.insert(e.end(),{s.effect,s.speed});
- pending.insert(pending.end(),e.begin(),e.end());feedbackDue=millis()+500;
+ pending.insert(pending.end(),e.begin(),e.end());feedbackDue=immediate?millis():millis()+500;
 }
 static void sendCaps(){
  std::vector<uint8_t>p;size_t n=strlen(DEVICE_NAME);p.push_back(n);p.insert(p.end(),DEVICE_NAME,DEVICE_NAME+n);
@@ -83,14 +83,14 @@ static void sendStatus(){
  sendFrame(STATUS_MSG,p);
 }
 static bool validate(uint8_t type,const uint8_t*p,size_t n){
- if(!n)return false;uint8_t count=p[0];size_t sz=type==SWITCH_SET?2:(type==RGB_SET?6:(type==EFFECT_SET?3:0));if(!sz||n!=1+count*sz)return false;
- size_t i=1;for(uint8_t k=0;k<count;k++){uint8_t id=p[i++];if(type==SWITCH_SET){uint8_t v=p[i++];if(indexOf(SWITCH_KIND,id)<0||v>1)return false;}else if(type==RGB_SET){i+=4;uint8_t on=p[i++];if(indexOf(RGB_KIND,id)<0||on>1)return false;}else{uint8_t e=p[i++];i++;if(indexOf(RGB_KIND,id)<0||!hasEffect(e))return false;}}return i==n;
+ if(!n)return false;uint8_t count=p[0];size_t sz=type==SWITCH_SET?2:(type==RGB_SET?6:(type==EFFECT_SET?3:(type==RGB_TRANSITION?10:0)));if(!sz||n!=1+count*sz)return false;
+ size_t i=1;for(uint8_t k=0;k<count;k++){uint8_t id=p[i++];if(type==SWITCH_SET){uint8_t v=p[i++];if(indexOf(SWITCH_KIND,id)<0||v>1)return false;}else if(type==RGB_SET){i+=4;uint8_t on=p[i++];if(indexOf(RGB_KIND,id)<0||on>1)return false;}else if(type==RGB_TRANSITION){i+=4;uint8_t on=p[i++];uint16_t duration=rd16(p+i);i+=2;uint16_t delay=rd16(p+i);i+=2;if(indexOf(RGB_KIND,id)<0||on>1||duration>5000||delay>1000)return false;}else{uint8_t e=p[i++];i++;if(indexOf(RGB_KIND,id)<0||!hasEffect(e))return false;}}return i==n;
 }
 static void enqueue(Cmd c){std::lock_guard<std::mutex>g(queueMutex);for(auto&q:queue)if(q.kind==c.kind&&q.id==c.id){q=c;return;}queue.push_back(c);}
 static void onCommand(const uint8_t*d,size_t n){
  if(n<6||d[0]!=MAGIC0||d[1]!=MAGIC1||d[2]!=VERSION||rd16(d+4)!=n-6)return;uint8_t type=d[3];const uint8_t*p=d+6;size_t len=n-6;
  if(type==CAPS_REQUEST&&len==0){sendCaps();return;}if(type==STATUS_REQUEST&&len==0){sendStatus();return;}if(!validate(type,p,len))return;
- size_t i=1;for(uint8_t k=0;k<p[0];k++){Cmd c{};c.id=p[i++];if(type==SWITCH_SET){c.kind=SWITCH_KIND;c.a=p[i++];}else if(type==RGB_SET){c.kind=RGB_KIND;c.a=p[i++];c.b=p[i++];c.c=p[i++];c.br=p[i++];c.on=p[i++];}else{c.kind=EFFECT_KIND;c.a=p[i++];c.b=p[i++];}enqueue(c);}
+ size_t i=1;for(uint8_t k=0;k<p[0];k++){Cmd c{};c.id=p[i++];if(type==SWITCH_SET){c.kind=SWITCH_KIND;c.a=p[i++];}else if(type==RGB_SET){c.kind=RGB_KIND;c.a=p[i++];c.b=p[i++];c.c=p[i++];c.br=p[i++];c.on=p[i++];}else if(type==RGB_TRANSITION){c.kind=RGB_KIND;c.transition=true;c.a=p[i++];c.b=p[i++];c.c=p[i++];c.br=p[i++];c.on=p[i++];c.duration=rd16(p+i);i+=2;c.startDelay=rd16(p+i);i+=2;}else{c.kind=EFFECT_KIND;c.a=p[i++];c.b=p[i++];}enqueue(c);}
 }
 class Callbacks:public NimBLECharacteristicCallbacks{void onWrite(NimBLECharacteristic*c,NimBLEConnInfo&)override{auto v=c->getValue();onCommand((const uint8_t*)v.data(),v.size());}};
 static void applyQueued(){
@@ -119,6 +119,6 @@ void setup(){
  NimBLEServer*server=NimBLEDevice::createServer();NimBLEService*svc=server->createService(SERVICE_UUID);
  auto*cmd=svc->createCharacteristic(COMMAND_UUID,NIMBLE_PROPERTY::WRITE|NIMBLE_PROPERTY::WRITE_NR);eventChar=svc->createCharacteristic(EVENTS_UUID,NIMBLE_PROPERTY::NOTIFY);cmd->setCallbacks(new Callbacks());svc->start();auto*adv=NimBLEDevice::getAdvertising();adv->addServiceUUID(SERVICE_UUID);adv->start();
 }
-void loop(){applyQueued();runEffects();flushFeedback();delay(1);}
+void loop(){applyQueued();runTransitions();runEffects();flushFeedback();delay(1);}
 """.trimIndent()
 }
