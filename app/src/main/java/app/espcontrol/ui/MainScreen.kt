@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
@@ -92,7 +93,7 @@ fun MainScreen(vm: ControlViewModel) {
         InfoCard(s, connected, centerRgb, centerSw, onOpen = { infoOpen = true })
 
         ColorDisc(
-            Modifier.offset(102.dp, 312.dp).size(184.dp).alpha(if (anySelOn) 1f else 0.4f),
+            Modifier.offset(102.dp, 312.dp).size(184.dp).shadow(32.dp, CircleShape).alpha(if (anySelOn) 1f else 0.4f),
             eff, discShade,
         ) { r, g, b -> vm.setColor(r, g, b) }
         Box(Modifier.offset(102.dp, 312.dp).size(184.dp), contentAlignment = Alignment.Center) {
@@ -171,7 +172,7 @@ private fun centerItem(items: List<OutItem>): OutItem? = items.firstOrNull { it.
 private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: OutItem?, onOpen: () -> Unit) {
     Column(
         Modifier.offset(58.dp, 48.dp).width(274.dp).height(236.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .shadow(28.dp, RoundedCornerShape(28.dp)).clip(RoundedCornerShape(28.dp))
             .background(Brush.verticalGradient(listOf(Color(0x12FFFFFF), Color(0x06FFFFFF))))
             .border(1.dp, C.Line, RoundedCornerShape(28.dp))
             .clickable(onClick = onOpen)
@@ -189,7 +190,7 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
         InfoRow("RGB", "${s.selRgb.size}/${s.rgbItems.size} sel · ${s.rgbItems.count { it.on }} on")
         InfoRow("Switches", "${s.selSw.size}/${s.swItems.size} sel · ${s.swItems.count { it.on }} on")
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            T("Colour", 12.5f, C.Muted, modifier = Modifier.width(96.dp))
+            T("Colour", 12.5f, C.Muted, modifier = Modifier.weight(1f))
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(10.dp).clip(CircleShape).background(Color(if (s.enR) s.r else 0, if (s.enG) s.g else 0, if (s.enB) s.b else 0)))
                 T("R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}", 12.5f, C.Text)
@@ -207,7 +208,7 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
 private fun InfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         T(label, 12.5f, C.Muted, modifier = Modifier.width(96.dp))
-        T(value, 12.5f, C.Text, modifier = Modifier.weight(1f))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { T(value, 12.5f, C.Text) }
     }
 }
 
