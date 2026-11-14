@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -144,14 +143,18 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
 
     private fun queue(l:Link,key:String,bytes:ByteArray) {
         l.pending[key]=bytes
-        l.sendJobs[key]?.cancel()
+        if (l.sendJobs[key]?.isActive == true) return
         l.sendJobs[key]=scope.launch {
-            delay(18)
-            lock.withLock {
-                val latest=l.pending.remove(key) ?: return@withLock
-                l.sendJobs.remove(key)
-                if(l.state==LinkState.ONLINE) send(l,latest[0].toInt() and 255,latest.copyOfRange(1,latest.size))
-                publish()
+            while (true) {
+                val latest = lock.withLock {
+                    val next=l.pending.remove(key)
+                    if (next == null) l.sendJobs.remove(key)
+                    next
+                } ?: break
+                lock.withLock {
+                    if(l.state==LinkState.ONLINE) send(l,latest[0].toInt() and 255,latest.copyOfRange(1,latest.size))
+                    publish()
+                }
             }
         }
     }
@@ -173,7 +176,20 @@ class DeviceHub(ctx: Context, @Suppress("UNUSED_PARAMETER") keys: OwnerKeyStore,
     fun rescan() { ble.ensureScanning() }
     fun onPermissionsChanged() { ble.ensureScanning() }
 
-    fun setRgb(id:String,out:Int,r:Int,g:Int,b:Int) { updateRgb(id,out) { it.copy(r=r.coerceIn(0,255),g=g.coerceIn(0,255),b=b.coerceIn(0,255)) } }
+    fun setRgb(id:String,out:Int,r:Int,g:Int,b:Int) { setRgbs(id, listOf(ProtocolV2.RgbCommand(out,r.coerceIn(0,255),g.coerceIn(0,255),b.coerceIn(0,255),255,true))) }
+    fun setRgbs(id:String, values:List<ProtocolV2.RgbCommand>) { scope.launch {
+        lock.withLock {
+            val l=links[id.lowercase()] ?: return@withLock
+            val valid=values.filter { v -> l.caps?.rgb?.any { it.id==v.id } == true }
+            if(valid.isEmpty()) return@withLock
+            valid.forEach { v ->
+                val old=l.rgb[v.id] ?: RgbState()
+                l.rgb[v.id]=old.copy(r=v.r,g=v.g,b=v.b,brightness=v.brightness,on=v.on)
+            }
+            queue(l,"rgb-batch",byteArrayOf(ProtocolV2.RGB_SET.toByte())+ProtocolV2.rgbs(valid))
+            publish()
+        }
+    } }
     fun setBrightness(id:String,out:Int,value:Int) { updateRgb(id,out) { it.copy(brightness=value.coerceIn(0,255)) } }
     fun setPower(id:String,out:Int,on:Boolean) { updateRgb(id,out) { it.copy(on=on) } }
     private fun updateRgb(id:String,out:Int,change:(RgbState)->RgbState) { scope.launch {
