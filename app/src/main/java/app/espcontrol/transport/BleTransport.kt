@@ -50,6 +50,8 @@ class BleTransport(private val ctx: Context) : Transport {
     private val advertFlow = MutableSharedFlow<Advert>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val adverts: SharedFlow<Advert> = advertFlow.asSharedFlow()
     private val readyFlow = MutableStateFlow<Set<String>>(emptySet())
+    private val errorFlow = MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 16)
+    val errors: SharedFlow<Pair<String, String>> = errorFlow.asSharedFlow()
     private val scanStatusFlow = MutableStateFlow("Bluetooth status unknown")
     val scanStatus: StateFlow<String> = scanStatusFlow.asStateFlow()
     private var compatibleFound = 0
@@ -204,10 +206,26 @@ class BleTransport(private val ctx: Context) : Transport {
 
     // ---- connection ----
     fun connect(address: String) {
-        if (!granted() || conns.containsKey(address)) return
-        val dev = mgr.adapter?.getRemoteDevice(address) ?: return
-        val g = dev.connectGatt(ctx, false, gattCb, BluetoothDevice.TRANSPORT_LE)
-        conns[address] = Conn(g)
+        if (conns.containsKey(address)) return
+        if (!granted()) {
+            errorFlow.tryEmit(address to "Bluetooth permission missing · allow Nearby devices")
+            return
+        }
+        val adapter = mgr.adapter
+        if (adapter == null || !adapter.isEnabled) {
+            errorFlow.tryEmit(address to "Bluetooth is OFF")
+            return
+        }
+        try {
+            val dev = adapter.getRemoteDevice(address)
+            val g = dev.connectGatt(ctx, false, gattCb, BluetoothDevice.TRANSPORT_LE)
+            if (g == null) errorFlow.tryEmit(address to "Android could not create a BLE GATT connection")
+            else conns[address] = Conn(g)
+        } catch (e: SecurityException) {
+            errorFlow.tryEmit(address to "Bluetooth permission denied")
+        } catch (e: Exception) {
+            errorFlow.tryEmit(address to "BLE connect failed · " + (e.message ?: e.javaClass.simpleName))
+        }
     }
 
     fun disconnect(address: String) {
@@ -226,6 +244,11 @@ class BleTransport(private val ctx: Context) : Transport {
                 if (!requested) g.discoverServices()
             } else {
                 conns.remove(addr)
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    errorFlow.tryEmit(addr to "BLE GATT connection failed · status $status")
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    errorFlow.tryEmit(addr to "BLE device disconnected")
+                }
                 try { g.close() } catch (e: Exception) { /* ignore */ }
                 publishReady()
             }
@@ -242,14 +265,26 @@ class BleTransport(private val ctx: Context) : Transport {
             val cmd = svc?.getCharacteristic(commandUuid)
             val evt = svc?.getCharacteristic(eventsUuid)
             val cccd = evt?.getDescriptor(CCCD)
-            if (status != BluetoothGatt.GATT_SUCCESS || cmd == null || evt == null || cccd == null) { g.disconnect(); return }
+            if (status != BluetoothGatt.GATT_SUCCESS || cmd == null || evt == null || cccd == null) {
+                errorFlow.tryEmit(g.device.address to "GATT service/characteristic mismatch · check firmware UUIDs")
+                g.disconnect()
+                return
+            }
             c.cmd = cmd
-            if (!g.setCharacteristicNotification(evt, true)) { g.disconnect(); return }
+            if (!g.setCharacteristicNotification(evt, true)) {
+                errorFlow.tryEmit(g.device.address to "Could not enable BLE notifications")
+                g.disconnect()
+                return
+            }
             writeDescriptor(g, cccd)
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) {
-            if (status != BluetoothGatt.GATT_SUCCESS) { g.disconnect(); return }
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                errorFlow.tryEmit(g.device.address to "BLE notification subscription failed · status $status")
+                g.disconnect()
+                return
+            }
             conns[g.device.address]?.ready = true
             publishReady()
         }
