@@ -42,6 +42,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -54,6 +55,11 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 data class RevItem(val name: String, val sel: Boolean, val on: Boolean, val dot: Color?)
+
+class RevolverController {
+    val rotation = mutableFloatStateOf(0f)
+    var motion: Job? = null
+}
 
 /** Visible left half of an oval that is twice as wide as the box (the right half is off-screen). */
 
@@ -75,39 +81,32 @@ private fun geometry(ui: Int, finite: Boolean): RevGeometry = if (ui == 2) {
     RevGeometry(92f, 260f, if (finite) 0.32f else 0.185f, 142f, 40f, 34f, 100f, 13f, 140f, 122f, 500f, 570f)
 }
 private fun slots(n: Int, rot: Float, ui: Int, finite: Boolean): List<Slot> {
+    if (n <= 0) return emptyList()
     val g = geometry(ui, finite)
-    return (0 until n).map { i ->
-        var d = if (finite) i - rot else (((i - rot) % n) + n) % n
-        if (!finite && d > n / 2f) d -= n
+    val range = if (ui == 2) 4 else 7
+    val first = if (finite) 0 else rot.toInt() - range
+    val last = if (finite) n - 1 else rot.toInt() + range
+    return (first..last).mapNotNull { virtualIndex ->
+        val itemIndex = if (finite) virtualIndex else ((virtualIndex % n) + n) % n
+        val d = virtualIndex - rot
         val th = d * g.step
         val c = cos(th)
         val ad = abs(d)
         val v = when {
-            ad <= 1f -> {
-                val t = ad
-                (1f - 0.06f * t) to (1f - 0.05f * t)
-            }
-            ad <= 2f -> {
-                val t = ad - 1f
-                (0.94f + (0.62f - 0.94f) * t) to (0.95f + (0.8f - 0.95f) * t)
-            }
-            ad <= 3f -> {
-                val t = ad - 2f
-                (0.62f + (0.46f - 0.62f) * t) to (0.8f + (0.62f - 0.8f) * t)
-            }
-            ad < 3.7f -> {
-                val t = (ad - 3f) / 0.7f
-                (0.46f + (0.38f - 0.46f) * t) to (0.62f * (1f - t))
-            }
+            ad <= 1f -> { val t = ad; (1f - 0.06f * t) to (1f - 0.05f * t) }
+            ad <= 2f -> { val t = ad - 1f; (0.94f + (0.62f - 0.94f) * t) to (0.95f + (0.8f - 0.95f) * t) }
+            ad <= 3f -> { val t = ad - 2f; (0.62f + (0.46f - 0.62f) * t) to (0.8f + (0.62f - 0.8f) * t) }
+            ad < 3.7f -> { val t = (ad - 3f) / 0.7f; (0.46f + (0.38f - 0.46f) * t) to (0.62f * (1f - t)) }
             else -> 0.38f to 0f
         }
         val visible = if (ui == 2) ad < 3.7f && c > 0.05f else c > 0.3f
-        val scale = if (ui == 2) v.first else 0.55f + 0.6f * max(c, 0f).pow(2.5f)
-        val opacity = if (ui == 2) v.second else min(1f, (c - 0.3f) * 4f)
-        Slot(i, visible, scale, opacity, 390f - g.r * c - g.w, CY + g.b * sin(th) - g.h / 2f)
+        if (!visible) null else {
+            val scale = if (ui == 2) v.first else 0.55f + 0.6f * max(c, 0f).pow(2.5f)
+            val opacity = if (ui == 2) v.second else min(1f, (c - 0.3f) * 4f)
+            Slot(itemIndex, true, scale, opacity, 390f - g.r * c - g.w, CY + g.b * sin(th) - g.h / 2f)
+        }
     }
 }
-
 /**
  * Oval revolver for RGB / switch lists. Every visible item is tappable (name = select, circle = ON/OFF).
  * Scroll modes: CLASSIC (1:1, with gain), ACCEL (mouse-like speed gain), FREE (keeps spinning after release).
@@ -115,16 +114,13 @@ private fun slots(n: Int, rot: Float, ui: Int, finite: Boolean): List<Slot> {
 @Composable
 fun Revolver(
     items: List<RevItem>, mode: ScrollMode, sens: Int, ui: Int = 1, finite: Boolean = false,
-    rotationState: MutableFloatState? = null,
+    controller: RevolverController, motionScope: CoroutineScope,
     onName: (Int) -> Unit, onToggle: (Int) -> Unit,
 ) {
     val n = items.size
     val g = geometry(ui, finite)
     val density = LocalDensity.current.density
-    val scope = rememberCoroutineScope()
-    val rotState = rotationState ?: remember { mutableFloatStateOf(0f) }
-    var rot by rotState
-    var motion by remember { mutableStateOf<Job?>(null) }
+    var rot by controller.rotation
     val curMode by rememberUpdatedState(mode)
     val curSens by rememberUpdatedState(sens)
     val curN by rememberUpdatedState(n)
@@ -134,8 +130,8 @@ fun Revolver(
     val toggleCb by rememberUpdatedState(onToggle)
 
     fun snap() {
-        motion?.cancel()
-        motion = scope.launch {
+        controller.motion?.cancel()
+        controller.motion = motionScope.launch {
             val target = rot.roundToInt().toFloat()
             animate(initialValue = rot, targetValue = target, animationSpec = tween(280)) { v, _ -> rot = v }
         }
@@ -198,7 +194,7 @@ fun Revolver(
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    motion?.cancel()
+                    controller.motion?.cancel()
                     val vt = VelocityTracker()
                     vt.addPosition(down.uptimeMillis, down.position)
                     var lastY = down.position.y
