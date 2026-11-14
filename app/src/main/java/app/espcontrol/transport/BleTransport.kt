@@ -2,6 +2,7 @@ package app.espcontrol.transport
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
@@ -14,7 +15,10 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
@@ -49,6 +53,9 @@ class BleTransport(private val ctx: Context) : Transport {
     private val advertFlow = MutableSharedFlow<Advert>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val adverts: SharedFlow<Advert> = advertFlow.asSharedFlow()
     private val readyFlow = MutableStateFlow<Set<String>>(emptySet())
+    private val scanStatusFlow = MutableStateFlow("Bluetooth status unknown")
+    val scanStatus: StateFlow<String> = scanStatusFlow.asStateFlow()
+    private var compatibleFound = 0
     /** BLE addresses with a fully set-up GATT session. */
     val ready: StateFlow<Set<String>> = readyFlow.asStateFlow()
 
@@ -58,7 +65,26 @@ class BleTransport(private val ctx: Context) : Transport {
         @Volatile var mtu = 23
     }
 
+
     private val mgr = ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+    private val radioReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                BluetoothAdapter.STATE_ON -> ensureScanning()
+                BluetoothAdapter.STATE_OFF, BluetoothAdapter.STATE_TURNING_OFF -> {
+                    stopScan()
+                    scanStatusFlow.value = "Bluetooth is OFF · turn it ON to scan"
+                }
+                BluetoothAdapter.STATE_TURNING_ON -> scanStatusFlow.value = "Bluetooth is turning ON…"
+            }
+        }
+    }
+    init {
+        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        if (Build.VERSION.SDK_INT >= 33) ctx.registerReceiver(radioReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else ctx.registerReceiver(radioReceiver, filter)
+    }
     private val prefs = ctx.getSharedPreferences("transport_config", Context.MODE_PRIVATE)
     @Volatile private var serviceUuid = readUuid("ble_service", "a6c60001-6b9f-4d8e-a251-5bd248e8c101")
     @Volatile private var commandUuid = readUuid("ble_command", "a6c60002-6b9f-4d8e-a251-5bd248e8c101")
@@ -102,23 +128,48 @@ class BleTransport(private val ctx: Context) : Transport {
     // ---- scanning ----
     private val scanCb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val name = result.scanRecord?.deviceName ?: result.device.name ?: return
-            if (!name.startsWith(namePrefix)) return
-            val id = name.removePrefix(namePrefix).lowercase()
-            if (id.length != 12) return
+            val name = result.scanRecord?.deviceName?.takeIf { it.isNotBlank() }
+                ?: runCatching { result.device.name }.getOrNull() ?: return
+            if (!name.startsWith(namePrefix, ignoreCase = true)) return
+            val id = name.substring(namePrefix.length).lowercase()
+            if (!id.matches(Regex("[0-9a-f]{12}"))) return
+            compatibleFound++
+            scanStatusFlow.value = "Scanning · " + compatibleFound + " compatible device(s) found"
             advertFlow.tryEmit(Advert(result.device.address, id, name, result.rssi))
         }
 
-        override fun onScanFailed(errorCode: Int) { scanning = false }
+        override fun onScanFailed(errorCode: Int) {
+            scanning = false
+            scanStatusFlow.value = "BLE scan failed · error " + errorCode
+        }
     }
 
     /** Safe to call repeatedly (e.g. after the user grants permissions). */
     fun ensureScanning() {
-        if (scanning || !granted()) return
-        val scanner = mgr.adapter?.takeIf { it.isEnabled }?.bluetoothLeScanner ?: return
-        val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(serviceUuid)).build())
+        if (scanning) return
+        if (!granted()) {
+            scanStatusFlow.value = if (Build.VERSION.SDK_INT >= 31) "Bluetooth scan/connect permission required" else "Location permission required for BLE scan"
+            return
+        }
+        val adapter = mgr.adapter
+        if (adapter == null) { scanStatusFlow.value = "This phone has no Bluetooth adapter"; return }
+        if (!adapter.isEnabled) { scanStatusFlow.value = "Bluetooth is OFF · turn it ON to scan"; return }
+        val scanner = adapter.bluetoothLeScanner
+        if (scanner == null) { scanStatusFlow.value = "BLE scanner unavailable · check Bluetooth"; return }
+        compatibleFound = 0
+        scanStatusFlow.value = "Starting BLE scan…"
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
-        try { scanner.startScan(filters, settings, scanCb); scanning = true } catch (e: Exception) { scanning = false }
+        try {
+            scanner.startScan(null, settings, scanCb)
+            scanning = true
+            scanStatusFlow.value = "Scanning for " + namePrefix + " devices…"
+        } catch (e: SecurityException) {
+            scanning = false
+            scanStatusFlow.value = "BLE permission denied · allow Nearby devices"
+        } catch (e: Exception) {
+            scanning = false
+            scanStatusFlow.value = "Unable to start BLE scan · " + e.javaClass.simpleName
+        }
     }
 
     private fun stopScan() {
