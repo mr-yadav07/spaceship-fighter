@@ -84,10 +84,11 @@ private fun slots(n: Int, rot: Float, ui: Int, finite: Boolean): List<Slot> {
     if (n <= 0) return emptyList()
     val g = geometry(ui, finite)
     val range = if (ui == 2) 4 else 7
-    val first = if (finite) 0 else rot.toInt() - range
-    val last = if (finite) n - 1 else rot.toInt() + range
+    // Every revolver is cyclic: no first/last-item boundary, including the settings menu.
+    val first = rot.toInt() - range
+    val last = rot.toInt() + range
     return (first..last).mapNotNull { virtualIndex ->
-        val itemIndex = if (finite) virtualIndex else ((virtualIndex % n) + n) % n
+        val itemIndex = ((virtualIndex % n) + n) % n
         val d = virtualIndex - rot
         val th = d * g.step
         val c = cos(th)
@@ -132,16 +133,15 @@ fun Revolver(
     fun snap() {
         controller.motion?.cancel()
         controller.motion = motionScope.launch {
-            val target = rot.roundToInt().toFloat()
-            animate(initialValue = rot, targetValue = target, animationSpec = tween(280)) { v, _ -> rot = v }
+            // Keep the exact release position; no forced snap or end-stop.
         }
     }
 
     fun stepBy(delta: Float) {
         controller.motion?.cancel()
         controller.motion = motionScope.launch {
-            val target = (rot + delta).let { if (curFinite) it.coerceIn(0f, (curN - 1).coerceAtLeast(0).toFloat()) else it }
-            animate(initialValue = rot, targetValue = target, animationSpec = tween(260)) { v, _ -> rot = v }
+            val target = rot + delta
+            animate(initialValue = rot, targetValue = target, animationSpec = tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { v, _ -> rot = v }
         }
     }
 
@@ -158,8 +158,7 @@ fun Revolver(
                 rot += vel * dt
                 vel *= exp(-dt / tau)
             }
-            val target = rot.roundToInt().toFloat()
-            animate(initialValue = rot, targetValue = target, animationSpec = tween(280)) { v, _ -> rot = v }
+            // Inertia naturally decays at the position reached; no forced snap.
         }
     }
 
@@ -215,9 +214,7 @@ fun Revolver(
                                 val v = (if (abs(tracked) > 0.001f) tracked else freeVelocity) *
                                     (0.7f + s * 1.1f)
                                 val bounded = v.coerceIn(-0.075f, 0.075f)
-                                if (abs(bounded) > 0.00025f) fling(bounded, s) else snap()
-                            } else {
-                                snap()
+                                if (abs(bounded) > 0.00025f) fling(bounded, s)
                             }
                             break
                         }
