@@ -275,11 +275,11 @@ static void applyQueued() {
         if (!s.duration) updateTransition(&s,&cfg,s.startAt);
       } else {
         s.r=c.a; s.g=c.b; s.b=c.c; s.brightness=c.br; s.on=c.on; s.transitioning=false;
-        renderRgb(s,cfg); queueState(RGB_KIND,c.id);
+        renderRgb(&s,&cfg); queueState(RGB_KIND,c.id);
       }
     } else {
       s.effect=c.a; s.speed=c.b;
-      if (!s.effect) renderRgb(s,cfg);
+      if (!s.effect) renderRgb(&s,&cfg);
       queueState(EFFECT_KIND,c.id);
     }
   }
