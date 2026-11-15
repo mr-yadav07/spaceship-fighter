@@ -181,7 +181,8 @@ static bool validate(uint8_t type, const uint8_t* p, size_t n) {
   }
   return i==n;
 }
-static void enqueue(const Cmd& cmd) {
+static void enqueue(void* input) {
+  const Cmd& cmd=*static_cast<const Cmd*>(input);
   portENTER_CRITICAL(&queueMux);
   for (uint8_t i=0;i<queueCount;i++) {
     if (commandQueue[i].kind==cmd.kind && commandQueue[i].id==cmd.id) {
@@ -193,7 +194,8 @@ static void enqueue(const Cmd& cmd) {
   if (queueCount<32) commandQueue[queueCount++]=cmd;
   portEXIT_CRITICAL(&queueMux);
 }
-template <typename T>\nstatic bool dequeue(T& cmd) {
+static bool dequeue(void* output) {
+  Cmd& cmd=*static_cast<Cmd*>(output);
   bool found=false;
   portENTER_CRITICAL(&queueMux);
   if (queueCount) {
@@ -221,7 +223,7 @@ static void onCommand(const uint8_t* d, size_t n) {
       c.a=p[i++]; c.b=p[i++]; c.c=p[i++]; c.br=p[i++]; c.on=p[i++];
       c.duration=rd16(p+i); i+=2; c.startDelay=rd16(p+i); i+=2;
     } else { c.kind=EFFECT_KIND; c.a=p[i++]; c.b=p[i++]; }
-    enqueue(c);
+    enqueue(&c);
   }
 }
 class Callbacks : public NimBLECharacteristicCallbacks {
@@ -230,13 +232,17 @@ class Callbacks : public NimBLECharacteristicCallbacks {
     onCommand((const uint8_t*)value.data(),value.size());
   }
 };
-template <typename T>\nstatic void renderRgb(T& s, const Candidate& cfg) {
+static void renderRgb(void* state, const void* config) {
+  State& s=*static_cast<State*>(state);
+  const Candidate& cfg=*static_cast<const Candidate*>(config);
   if (!s.strip) return;
   s.strip->fill(s.on?s.strip->Color(s.r,s.g,s.b):0);
   s.strip->setBrightness(s.brightness);
   s.strip->show();
 }
-template <typename T>\nstatic void updateTransition(T& s, const Candidate& cfg, uint32_t now) {
+static void updateTransition(void* state, const void* config, uint32_t now) {
+  State& s=*static_cast<State*>(state);
+  const Candidate& cfg=*static_cast<const Candidate*>(config);
   if (!s.transitioning) return;
   if ((int32_t)(now-s.startAt)<0) return;
   float t=s.duration==0?1.0f:min(1.0f,(float)(now-s.startAt)/(float)s.duration);
@@ -244,19 +250,19 @@ template <typename T>\nstatic void updateTransition(T& s, const Candidate& cfg, 
   s.g=(uint8_t)(s.fg+((float)s.tg-s.fg)*t+0.5f);
   s.b=(uint8_t)(s.fb+((float)s.tb-s.fb)*t+0.5f);
   s.brightness=(uint8_t)(s.fbr+((float)s.tbr-s.fbr)*t+0.5f);
-  renderRgb(s,cfg);
+  renderRgb(&s,&cfg);
   if (t>=1.0f) { s.transitioning=false; queueState(RGB_KIND,cfg.id,true); }
 }
 static void applyQueued() {
   Cmd c;
-  while (dequeue(c)) {
+  while (dequeue(&c)) {
     int ix=indexOf(c.kind,c.id); if (ix<0) continue;
     State& s=states[ix]; const Candidate& cfg=CANDIDATES[ix];
     if (c.kind==SWITCH_KIND) {
       s.switchOn=c.a; digitalWrite(cfg.pin,s.switchOn?HIGH:LOW);
       queueState(c.kind,c.id);
     } else if (c.kind==RGB_KIND) {
-      updateTransition(s,cfg,millis());
+      updateTransition(&s,&cfg,millis());
       s.effect=0;
       if (c.transition) {
         s.fr=s.r; s.fg=s.g; s.fb=s.b; s.fbr=s.brightness;
@@ -266,7 +272,7 @@ static void applyQueued() {
         uint16_t delay=s.transitioning?0:c.startDelay;
         s.startAt=millis()+delay;
         s.transitioning=true;
-        if (!s.duration) updateTransition(s,cfg,s.startAt);
+        if (!s.duration) updateTransition(&s,&cfg,s.startAt);
       } else {
         s.r=c.a; s.g=c.b; s.b=c.c; s.brightness=c.br; s.on=c.on; s.transitioning=false;
         renderRgb(s,cfg); queueState(RGB_KIND,c.id);
@@ -283,7 +289,7 @@ static void runTransitions() {
   if (now-lastTransitionFrame<16) return;
   lastTransitionFrame=now;
   for (size_t i=0;i<CANDIDATE_COUNT;i++) {
-    if (CANDIDATES[i].kind==RGB_KIND) updateTransition(states[i],CANDIDATES[i],now);
+    if (CANDIDATES[i].kind==RGB_KIND) updateTransition(&states[i],&CANDIDATES[i],now);
   }
 }
 static void runEffects() {
