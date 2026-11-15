@@ -94,7 +94,7 @@ fun MainScreen(vm: ControlViewModel) {
                 .background(Brush.verticalGradient(when (selectedTheme) { "Light" -> listOf(Color(0xFFE9EBF2), Color(0xFFD4D8E3)); "AMOLED" -> listOf(Color.Black, Color.Black); else -> listOf(C.Bg1, C.Bg2) }))
                 .clip(RoundedCornerShape(0.dp)),
         ) {
-        Box(Modifier.fillMaxSize().blur(if (panel != Panel.NONE || sheet != Sheet.NONE || infoOpen) 9.dp else 0.dp)) {
+        Box(Modifier.fillMaxSize().blur(if (sheet != Sheet.NONE || infoOpen) 9.dp else 0.dp)) {
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
