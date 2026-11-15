@@ -79,7 +79,7 @@ fun MainScreen(vm: ControlViewModel) {
     val centerSw = centerItem(s.swItems)
 
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(C.Bg2),
+        Modifier.fillMaxSize().background(Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
         val canvasScale = minOf(1f, maxWidth / 390.dp, maxHeight / 844.dp)
@@ -198,6 +198,7 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
             .border(1.dp, C.Line, RoundedCornerShape(28.dp))
             .clickable(onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             T("INFORMATION", 11f, C.Muted, FontWeight.SemiBold)
@@ -206,30 +207,30 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
                 T(if (s.demo) "DEMO" else "LIVE", 11f, if (s.demo) C.Orange else C.Green, FontWeight.SemiBold)
             }
         }
-        Spacer(Modifier.height(6.dp))
         InfoRow("Connected", "$connected devices")
         InfoRow("RGB", "${s.selRgb.size}/${s.rgbItems.size} sel · ${s.rgbItems.count { it.on }} on")
         InfoRow("Switches", "${s.selSw.size}/${s.swItems.size} sel · ${s.swItems.count { it.on }} on")
-        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
             T("Colour", 12.5f, C.Muted, modifier = Modifier.weight(1f))
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(10.dp).clip(CircleShape).background(Color(if (s.enR) s.r else 0, if (s.enG) s.g else 0, if (s.enB) s.b else 0)))
-                T("R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}", 12.5f, C.Text)
+                T("R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}", 11.5f, C.Text)
             }
+            T("›", 17f, C.Muted, modifier = Modifier.width(18.dp))
         }
         InfoRow("Brightness", "${(s.br * 100 / 255)}%")
         Spacer(Modifier.weight(1f))
-        Spacer(Modifier.height(8.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
-        T(s.msg, 12f, C.Warn, modifier = Modifier.padding(top = 6.dp))
+        T(s.msg, 12f, C.Warn, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        T(label, 12.5f, C.Muted, modifier = Modifier.width(96.dp))
+    Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
+        T(label, 12.5f, C.Muted, modifier = Modifier.weight(1f))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { T(value, 12.5f, C.Text) }
+        T("›", 17f, C.Muted, modifier = Modifier.width(18.dp))
     }
 }
 
