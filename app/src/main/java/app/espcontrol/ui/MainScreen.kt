@@ -63,6 +63,7 @@ fun MainScreen(vm: ControlViewModel) {
     var settingsSheet by remember { mutableStateOf(Sheet.NONE) }
     var menuSheet by remember { mutableStateOf(Sheet.NONE) }
     var infoOpen by remember { mutableStateOf(false) }
+    var sheetOrigin by remember { mutableStateOf(Panel.NONE) }
     var revolverUi by remember { mutableStateOf(1) }
     var selectedTheme by remember { mutableStateOf("Dark") }
     var switchPowerUp by remember { mutableStateOf("Last") }
@@ -140,7 +141,7 @@ fun MainScreen(vm: ControlViewModel) {
 
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(tween(250)), exit = fadeOut(tween(250))) {
             when (panel) {
-                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi, revolverController, revolverScope) { open -> settingsSheet = open; sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
+                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi, revolverController, revolverScope) { open -> settingsSheet = open; sheetOrigin = Panel.SETTINGS; sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
                 Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
                 Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
@@ -151,17 +152,22 @@ fun MainScreen(vm: ControlViewModel) {
         AnimatedVisibility(infoOpen, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             InfoDetailPlaceholder { infoOpen = false }
         }
+        val closeSheet: () -> Unit = {
+            sheet = Sheet.NONE
+            panel = when (sheetOrigin) { Panel.SETTINGS -> Panel.SETTINGS; Panel.MENU -> Panel.MENU; else -> Panel.NONE }
+            if (sheetOrigin == Panel.NONE) infoOpen = true
+        }
         AnimatedVisibility(sheet != Sheet.NONE, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             when (sheet) {
-                Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
-                Sheet.THEME -> ThemeSheet(selectedTheme, { selectedTheme = it; sheet = Sheet.NONE }, { sheet = Sheet.NONE })
-                Sheet.SWITCH -> SwitchConfigSheet(s, switchPowerUp, switchMode, { switchPowerUp = it }, { switchMode = it }, { vm.setSelectedSwitches(true) }, { vm.setSelectedSwitches(false) }, { sheet = Sheet.NONE })
-                Sheet.DEVICES -> DevicesSheet(s, vm) { sheet = Sheet.NONE }
-                Sheet.SECURITY -> SecuritySheet(vm) { sheet = Sheet.NONE }
-                Sheet.CONNECTION -> ConnectionSheet(vm) { sheet = Sheet.NONE }
-                Sheet.SCROLL -> ScrollSheet(s, vm) { sheet = Sheet.NONE }
-                Sheet.EFFECTS -> EffectsSheet(s, vm) { sheet = Sheet.NONE }
-                Sheet.FIRMWARE -> FirmwareSheet(s) { sheet = Sheet.NONE }
+                Sheet.UI -> UiStyleSheet(revolverUi, { revolverUi = it; closeSheet() }, closeSheet)
+                Sheet.THEME -> ThemeSheet(selectedTheme, { selectedTheme = it; closeSheet() }, closeSheet)
+                Sheet.SWITCH -> SwitchConfigSheet(s, switchPowerUp, switchMode, { switchPowerUp = it }, { switchMode = it }, { vm.setSelectedSwitches(true) }, { vm.setSelectedSwitches(false) }, closeSheet)
+                Sheet.DEVICES -> DevicesSheet(s, vm, closeSheet)
+                Sheet.SECURITY -> SecuritySheet(vm, closeSheet)
+                Sheet.CONNECTION -> ConnectionSheet(vm, closeSheet)
+                Sheet.SCROLL -> ScrollSheet(s, vm, closeSheet)
+                Sheet.EFFECTS -> EffectsSheet(s, vm, closeSheet)
+                Sheet.FIRMWARE -> FirmwareSheet(s, closeSheet)
                 else -> {}
             }
         }
@@ -170,7 +176,7 @@ fun MainScreen(vm: ControlViewModel) {
             panel,
             onSettings = {
                 if (panel == Panel.SETTINGS) panel = Panel.NONE
-                else if (settingsSheet != Sheet.NONE) { panel = Panel.NONE; sheet = if (sheet == settingsSheet) Sheet.NONE else settingsSheet }
+                else if (settingsSheet != Sheet.NONE) { panel = Panel.NONE; sheetOrigin = Panel.SETTINGS; sheet = if (sheet == settingsSheet) Sheet.NONE else settingsSheet }
                 else { sheet = Sheet.NONE; panel = Panel.SETTINGS }
             },
             onScan = { sheet = Sheet.NONE; panel = if (panel == Panel.SCAN) Panel.NONE else Panel.SCAN },
@@ -178,7 +184,7 @@ fun MainScreen(vm: ControlViewModel) {
             onSwitch = { sheet = Sheet.NONE; panel = if (panel == Panel.SWITCH) Panel.NONE else Panel.SWITCH },
             onMenu = {
                 if (panel == Panel.MENU) panel = Panel.NONE
-                else if (menuSheet != Sheet.NONE) { panel = Panel.NONE; sheet = if (sheet == menuSheet) Sheet.NONE else menuSheet }
+                else if (menuSheet != Sheet.NONE) { panel = Panel.NONE; sheetOrigin = Panel.MENU; sheet = if (sheet == menuSheet) Sheet.NONE else menuSheet }
                 else { sheet = Sheet.NONE; panel = Panel.MENU }
             },
         )
