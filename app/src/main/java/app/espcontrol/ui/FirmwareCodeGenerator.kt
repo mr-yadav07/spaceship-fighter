@@ -32,7 +32,7 @@ object FirmwareCodeGenerator {
             else "  {SWITCH_KIND, $id, $pin, 0, \"$name\"}"
         }
         val selectedEffects = presetEffects.filter { it.first in enabledEffects }
-        val effectRows = selectedEffects.joinToString(",\\n") { (id, name) -> "  {$id, \\"$name\\"}" }.ifBlank { "  {0,\\"\\"}" }
+        val effectRows = selectedEffects.joinToString(",\n") { (id, name) -> "  {$id, \"$name\"}" }.ifBlank { "  {0,\"\"}" }
         return SOURCE.replace("@DEVICE@", safeName).replace("@CANDIDATES@", rows)
             .replace("@EFFECTS@", effectRows).replace("@EFFECT_COUNT@", selectedEffects.size.toString())
     }
