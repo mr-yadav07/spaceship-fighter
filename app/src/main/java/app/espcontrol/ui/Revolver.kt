@@ -51,7 +51,6 @@ import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 data class RevItem(val name: String, val sel: Boolean, val on: Boolean, val dot: Color?)
@@ -129,13 +128,6 @@ fun Revolver(
     val curFinite by rememberUpdatedState(finite)
     val nameCb by rememberUpdatedState(onName)
     val toggleCb by rememberUpdatedState(onToggle)
-
-    fun snap() {
-        controller.motion?.cancel()
-        controller.motion = motionScope.launch {
-            // Keep the exact release position; no forced snap or end-stop.
-        }
-    }
 
     fun stepBy(delta: Float) {
         controller.motion?.cancel()
