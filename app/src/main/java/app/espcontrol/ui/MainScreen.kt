@@ -65,6 +65,7 @@ fun MainScreen(vm: ControlViewModel) {
     var infoOpen by remember { mutableStateOf(false) }
     var infoTopic by remember { mutableStateOf("") }
     var sheetOrigin by remember { mutableStateOf(Panel.NONE) }
+    var panelOriginInfo by remember { mutableStateOf(false) }
     var revolverUi by remember { mutableStateOf(1) }
     var selectedTheme by remember { mutableStateOf("Dark") }
     var switchPowerUp by remember { mutableStateOf("Last") }
@@ -146,12 +147,12 @@ fun MainScreen(vm: ControlViewModel) {
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
                 Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
                 Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
-                Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> menuSheet = target; panel = Panel.NONE; sheet = target })
+                Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> menuSheet = target; sheetOrigin = Panel.MENU; panel = Panel.NONE; sheet = target })
                 else -> {}
             }
         }
         AnimatedVisibility(infoOpen, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-            InfoDetailPanel(topic = infoTopic, state = s, connected = connected, onBack = { if (infoTopic.isNotEmpty()) infoTopic = "" else infoOpen = false }, onTopic = { infoTopic = it }, onOpenSheet = { sheetOrigin = Panel.NONE; sheet = it }, onOpenPanel = { infoOpen = false; panel = it })
+            InfoDetailPanel(topic = infoTopic, state = s, connected = connected, onBack = { if (infoTopic.isNotEmpty()) infoTopic = "" else infoOpen = false }, onTopic = { infoTopic = it }, onOpenSheet = { sheetOrigin = Panel.NONE; sheet = it }, onOpenPanel = { panelOriginInfo = true; infoOpen = false; panel = it })
         }
         val closeSheet: () -> Unit = {
             sheet = Sheet.NONE
@@ -170,6 +171,16 @@ fun MainScreen(vm: ControlViewModel) {
                 Sheet.EFFECTS -> EffectsSheet(s, vm, closeSheet)
                 Sheet.FIRMWARE -> FirmwareSheet(s, closeSheet)
                 else -> {}
+            }
+        }
+
+        if (panel != Panel.NONE) {
+            Box(Modifier.offset(18.dp, 92.dp)) {
+                BackBtn {
+                    panel = Panel.NONE
+                    if (panelOriginInfo) infoOpen = true
+                    panelOriginInfo = false
+                }
             }
         }
 
