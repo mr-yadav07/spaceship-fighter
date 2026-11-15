@@ -193,7 +193,7 @@ static void enqueue(const Cmd& cmd) {
   if (queueCount<32) commandQueue[queueCount++]=cmd;
   portEXIT_CRITICAL(&queueMux);
 }
-static bool dequeue(Cmd& cmd) {
+template <typename T>\nstatic bool dequeue(T& cmd) {
   bool found=false;
   portENTER_CRITICAL(&queueMux);
   if (queueCount) {
@@ -230,13 +230,13 @@ class Callbacks : public NimBLECharacteristicCallbacks {
     onCommand((const uint8_t*)value.data(),value.size());
   }
 };
-static void renderRgb(State& s, const Candidate& cfg) {
+template <typename T>\nstatic void renderRgb(T& s, const Candidate& cfg) {
   if (!s.strip) return;
   s.strip->fill(s.on?s.strip->Color(s.r,s.g,s.b):0);
   s.strip->setBrightness(s.brightness);
   s.strip->show();
 }
-static void updateTransition(State& s, const Candidate& cfg, uint32_t now) {
+template <typename T>\nstatic void updateTransition(T& s, const Candidate& cfg, uint32_t now) {
   if (!s.transitioning) return;
   if ((int32_t)(now-s.startAt)<0) return;
   float t=s.duration==0?1.0f:min(1.0f,(float)(now-s.startAt)/(float)s.duration);
