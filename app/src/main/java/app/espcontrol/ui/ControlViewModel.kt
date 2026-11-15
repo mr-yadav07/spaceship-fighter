@@ -36,12 +36,16 @@ data class UiState(
     val mode: ScrollMode = ScrollMode.CLASSIC,
     val sens: Map<ScrollMode, Int> = mapOf(ScrollMode.CLASSIC to 0, ScrollMode.ACCEL to 50, ScrollMode.FREE to 50),
     val demo: Boolean = false,
+    val rgbSyncActive: Boolean = false,
+    val switchSyncActive: Boolean = false,
 ) {
     val effR get() = if (enR) r else 0
     val effG get() = if (enG) g else 0
     val effB get() = if (enB) b else 0
     val rgbPowerOn get() = rgbItems.any { it.key in selRgb && it.on }
 }
+
+private data class RgbSnapshot(val r: Int, val g: Int, val b: Int, val brightness: Int, val on: Boolean)
 
 class ControlViewModel(app: Application) : AndroidViewModel(app) {
     private val espApp = app as EspApp
@@ -56,6 +60,8 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         val msg: String = "Ready", val mode: ScrollMode = ScrollMode.CLASSIC,
         val sens: Map<ScrollMode, Int> = emptyMap(),
         val demo: Boolean = false, val demoRgb: List<OutItem> = emptyList(), val demoSw: List<OutItem> = emptyList(),
+        val rgbSyncSnapshots: Map<String, RgbSnapshot>? = null,
+        val switchSyncSnapshots: Map<String, Boolean>? = null,
     )
 
     private val local = MutableStateFlow(
@@ -122,6 +128,8 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
             selSw = l.selSw.filter { k -> sw.any { it.key == k } }.toSet(),
             r = l.r, g = l.g, b = l.b, br = l.br, enR = l.enR, enG = l.enG, enB = l.enB,
             msg = l.msg, mode = l.mode, sens = l.sens, demo = l.demo,
+            rgbSyncActive = l.rgbSyncSnapshots != null,
+            switchSyncActive = l.switchSyncSnapshots != null,
         )
     }
 
@@ -174,21 +182,7 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
     fun setBrightness(v: Int) {
         local.update { it.copy(br = v) }
         val state = local.value
-        if (!state.demo) {
-            val group = selectedRgb(state).groupBy { it.devId }.mapValues { (_, outputs) ->
-                outputs.map { item ->
-                    app.espcontrol.protocol.ProtocolV2.RgbCommand(
-                        item.out,
-                        if (state.enR) state.r else 0,
-                        if (state.enG) state.g else 0,
-                        if (state.enB) state.b else 0,
-                        v,
-                        item.on,
-                    )
-                }
-            }
-            if (group.isNotEmpty()) hub.setRgbGroup(group)
-        }
+        if (!state.demo) selectedRgb(state).forEach { item -> hub.setBrightness(item.devId, item.out, v) }
     }
 
     fun togglePower() {
@@ -217,10 +211,47 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun syncRgb() {
-        val n = selectedRgb().size
-        if (n == 0) { msg("Sync: no RGB selected"); return }
-        pushColor(local.value)
-        msg("Synced colour to $n outputs")
+        val state = local.value
+        val targets = selectedRgb(state)
+        if (state.rgbSyncSnapshots == null) {
+            if (targets.isEmpty()) { msg("Sync: no RGB selected"); return }
+            val snapshots = targets.associate { item ->
+                val saved = if (state.demo) {
+                    RgbSnapshot(item.color.red.toInt(), item.color.green.toInt(), item.color.blue.toInt(), state.br, item.on)
+                } else {
+                    val current = ui.value.devices.firstOrNull { it.id == item.devId }?.rgbStates?.get(item.out)
+                    RgbSnapshot(current?.r ?: item.color.red.toInt(), current?.g ?: item.color.green.toInt(),
+                        current?.b ?: item.color.blue.toInt(), current?.brightness ?: state.br, current?.on ?: item.on)
+                }
+                item.key to saved
+            }
+            local.update { it.copy(rgbSyncSnapshots = snapshots) }
+            pushColor(local.value)
+            msg("RGB sync ON · " + targets.size + " outputs")
+        } else {
+            restoreRgb(state.rgbSyncSnapshots)
+            local.update { it.copy(rgbSyncSnapshots = null) }
+            msg("RGB sync OFF · previous colours restored")
+        }
+    }
+
+    private fun restoreRgb(snapshots: Map<String, RgbSnapshot>) {
+        val targets = ui.value.rgbItems.filter { it.key in snapshots }
+        if (local.value.demo) {
+            targets.forEach { item ->
+                val saved = snapshots[item.key] ?: return@forEach
+                demoUpdate(item.key) { it.copy(color = Color(saved.r, saved.g, saved.b), on = saved.on) }
+            }
+        } else {
+            val group = targets.groupBy { it.devId }.mapValues { (_, outputs) ->
+                outputs.mapNotNull { item ->
+                    snapshots[item.key]?.let { saved ->
+                        app.espcontrol.protocol.ProtocolV2.RgbCommand(item.out, saved.r, saved.g, saved.b, saved.brightness, saved.on)
+                    }
+                }
+            }
+            if (group.isNotEmpty()) hub.setRgbGroup(group)
+        }
     }
 
     // ---------------------------------------------------------------- selection / switches
@@ -238,9 +269,18 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
         else if (item.isRgb) hub.setPower(item.devId, item.out, target) else hub.setOnOff(item.devId, item.out, target)
     }
 
-    fun dselect(isRgb: Boolean) {
-        local.update { if (isRgb) it.copy(selRgb = emptySet()) else it.copy(selSw = emptySet()) }
-        msg(if (isRgb) "RGB: all deselected" else "Switches: all deselected")
+    fun toggleSelectAll(isRgb: Boolean) {
+        val current = ui.value
+        val items = if (isRgb) current.rgbItems else current.swItems
+        if (items.isEmpty()) { msg(if (isRgb) "RGB: no devices available" else "Switches: no devices available"); return }
+        val selected = if (isRgb) current.selRgb else current.selSw
+        val deselect = selected.size == items.size && items.all { it.key in selected }
+        local.update { l ->
+            if (isRgb) l.copy(selRgb = if (deselect) emptySet() else items.map { it.key }.toSet())
+            else l.copy(selSw = if (deselect) emptySet() else items.map { it.key }.toSet())
+        }
+        msg(if (deselect) (if (isRgb) "RGB: all deselected" else "Switches: all deselected")
+            else (if (isRgb) "RGB: all selected" else "Switches: all selected"))
     }
 
     fun setSelectedSwitches(on: Boolean) {
@@ -259,10 +299,26 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun syncSwitches(center: OutItem?) {
+        val state = local.value
         val sel = selected(false)
-        if (sel.isEmpty() || center == null) { msg("Sync: no switch selected"); return }
-        for (it in sel) if (ui.value.demo) demoUpdate(it.key) { x -> x.copy(on = center.on) } else hub.setOnOff(it.devId, it.out, center.on)
-        msg("Synced ${sel.size} switches to ${center.label} (${if (center.on) "ON" else "OFF"})")
+        if (state.switchSyncSnapshots == null) {
+            if (sel.isEmpty() || center == null) { msg("Sync: no switch selected"); return }
+            val snapshots = sel.associate { it.key to it.on }
+            local.update { it.copy(switchSyncSnapshots = snapshots) }
+            for (item in sel) if (state.demo) demoUpdate(item.key) { x -> x.copy(on = center.on) }
+                else hub.setOnOff(item.devId, item.out, center.on)
+            msg("Switch sync ON · " + sel.size + " outputs")
+        } else {
+            val snapshots = state.switchSyncSnapshots
+            val all = ui.value.swItems.filter { it.key in snapshots }
+            for (item in all) {
+                val old = snapshots[item.key] ?: continue
+                if (state.demo) demoUpdate(item.key) { x -> x.copy(on = old) }
+                else hub.setOnOff(item.devId, item.out, old)
+            }
+            local.update { it.copy(switchSyncSnapshots = null) }
+            msg("Switch sync OFF · previous states restored")
+        }
     }
 
     /** Trigger an effect by its advertised name. Each selected device resolves that name
