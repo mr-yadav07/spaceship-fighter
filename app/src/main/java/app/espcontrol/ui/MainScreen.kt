@@ -63,6 +63,7 @@ fun MainScreen(vm: ControlViewModel) {
     var settingsSheet by remember { mutableStateOf(Sheet.NONE) }
     var menuSheet by remember { mutableStateOf(Sheet.NONE) }
     var infoOpen by remember { mutableStateOf(false) }
+    var infoTopic by remember { mutableStateOf("") }
     var sheetOrigin by remember { mutableStateOf(Panel.NONE) }
     var revolverUi by remember { mutableStateOf(1) }
     var selectedTheme by remember { mutableStateOf("Dark") }
@@ -104,7 +105,7 @@ fun MainScreen(vm: ControlViewModel) {
                 ),
         )
 
-        InfoCard(s, connected, centerRgb, centerSw, onOpen = { infoOpen = true })
+        InfoCard(s, connected, centerRgb, centerSw, onOpen = { infoOpen = true; infoTopic = "" }, onTopic = { infoOpen = true; infoTopic = it })
 
         ColorDisc(
             Modifier.offset(102.dp, 312.dp).size(184.dp).shadow(32.dp, CircleShape).alpha(if (anySelOn) 1f else 0.4f),
@@ -150,7 +151,7 @@ fun MainScreen(vm: ControlViewModel) {
             }
         }
         AnimatedVisibility(infoOpen, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-            InfoDetailPlaceholder { infoOpen = false }
+            InfoDetailPanel(topic = infoTopic, state = s, connected = connected, onBack = { if (infoTopic.isNotEmpty()) infoTopic = "" else infoOpen = false }, onTopic = { infoTopic = it }, onOpenSheet = { sheetOrigin = Panel.NONE; sheet = it }, onOpenPanel = { infoOpen = false; panel = it })
         }
         val closeSheet: () -> Unit = {
             sheet = Sheet.NONE
@@ -196,16 +197,12 @@ fun MainScreen(vm: ControlViewModel) {
 private fun centerItem(items: List<OutItem>): OutItem? = items.firstOrNull { it.on } ?: items.firstOrNull()
 
 @Composable
-private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: OutItem?, onOpen: () -> Unit) {
-    Column(
-        Modifier.offset(58.dp, 48.dp).width(274.dp).height(236.dp)
-            .shadow(28.dp, RoundedCornerShape(28.dp)).clip(RoundedCornerShape(28.dp))
-            .background(Brush.verticalGradient(listOf(Color(0x12FFFFFF), Color(0x06FFFFFF))))
-            .border(1.dp, C.Line, RoundedCornerShape(28.dp))
-            .clickable(onClick = onOpen)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
+private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: OutItem?, onOpen: () -> Unit, onTopic: (String) -> Unit) {
+    Column(Modifier.offset(58.dp, 48.dp).width(274.dp).height(236.dp)
+        .shadow(28.dp, RoundedCornerShape(28.dp)).clip(RoundedCornerShape(28.dp))
+        .background(Brush.verticalGradient(listOf(Color(0x12FFFFFF), Color(0x06FFFFFF))))
+        .border(1.dp, C.Line, RoundedCornerShape(28.dp)).clickable(onClick = onOpen)
+        .padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             T("INFORMATION", 11f, C.Muted, FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -213,18 +210,11 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
                 T(if (s.demo) "DEMO" else "LIVE", 11f, if (s.demo) C.Orange else C.Green, FontWeight.SemiBold)
             }
         }
-        InfoRow("Connected", "$connected devices")
-        InfoRow("RGB", "${s.selRgb.size}/${s.rgbItems.size} sel · ${s.rgbItems.count { it.on }} on")
-        InfoRow("Switches", "${s.selSw.size}/${s.swItems.size} sel · ${s.swItems.count { it.on }} on")
-        Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            T("Colour", 12.5f, C.Muted, modifier = Modifier.weight(1f))
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(Color(if (s.enR) s.r else 0, if (s.enG) s.g else 0, if (s.enB) s.b else 0)))
-                T("R ${if (s.enR) s.r else "–"} · G ${if (s.enG) s.g else "–"} · B ${if (s.enB) s.b else "–"}", 11.5f, C.Text)
-            }
-            T("›", 17f, C.Muted, modifier = Modifier.width(18.dp))
-        }
-        InfoRow("Brightness", "${(s.br * 100 / 255)}%")
+        InfoRow("Connected", connected.toString() + " devices", { onTopic("Connected") })
+        InfoRow("RGB", s.selRgb.size.toString() + "/" + s.rgbItems.size + " sel · " + s.rgbItems.count { it.on } + " on", { onTopic("RGB") })
+        InfoRow("Switches", s.selSw.size.toString() + "/" + s.swItems.size + " sel · " + s.swItems.count { it.on } + " on", { onTopic("Switches") })
+        InfoRow("Colour", "R " + s.r + " · G " + s.g + " · B " + s.b, { onTopic("Colour") })
+        InfoRow("Brightness", (s.br * 100 / 255).toString() + "%", { onTopic("Brightness") })
         Spacer(Modifier.weight(1f))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x18FFFFFF)))
         T(s.msg, 12f, C.Warn, modifier = Modifier.padding(top = 2.dp))
@@ -232,14 +222,77 @@ private fun InfoCard(s: UiState, connected: Int, centerRgb: OutItem?, centerSw: 
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun InfoRow(label: String, value: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(20.dp).clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         T(label, 12.5f, C.Muted, modifier = Modifier.weight(1f))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { T(value, 12.5f, C.Text) }
         T("›", 17f, C.Muted, modifier = Modifier.width(18.dp))
     }
 }
 
+@Composable
+private fun InfoDetailPanel(topic: String, state: UiState, connected: Int, onBack: () -> Unit, onTopic: (String) -> Unit, onOpenSheet: (Sheet) -> Unit, onOpenPanel: (Panel) -> Unit) {
+    val descriptions = mapOf(
+        "Connected" to "Shows connected ESP devices. Open Scan to discover and connect nearby BLE devices.",
+        "RGB" to "View RGB outputs, select strips, toggle power, and control colour and brightness. Firmware setup manages ESP32 GPIO and LED candidates.",
+        "Switches" to "View relay outputs and control ON/OFF state. Switch configuration controls startup and operating behaviour.",
+        "Colour" to "The colour disc and R, G, B channels set output colour. Channel toggles exclude an individual colour component.",
+        "Brightness" to "Controls RGB brightness from 0 to 255. The current value appears beside the vertical slider.",
+        "Effect" to "Browse effects advertised by connected ESP32 devices. Theme configuration changes the app appearance."
+    )
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.offset(38.dp, 112.dp).width(314.dp).height(620.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                T(if (topic.isEmpty()) "INFORMATION GUIDE" else topic, 17f, weight = FontWeight.SemiBold)
+                T("‹", 26f, C.Muted, modifier = Modifier.clickable(onClick = onBack).padding(horizontal = 8.dp))
+            }
+            if (topic.isEmpty()) {
+                T("Select a section to learn what it does and open its controls directly.", 12.5f, C.Muted)
+                listOf("Connected", "RGB", "Switches", "Colour", "Brightness", "Effect").forEach { key ->
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0x142A2D3A)).clickable { onTopic(key) }.padding(12.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { T(key, 14f, weight = FontWeight.SemiBold); T("›", 19f, C.Muted) }
+                        T(descriptions[key] ?: "", 11f, C.Muted, modifier = Modifier.padding(top = 3.dp), maxLines = 2)
+                    }
+                }
+            } else {
+                T(descriptions[topic] ?: "Information about this control.", 13f, C.Muted)
+                when (topic) {
+                    "Connected" -> {
+                        T(connected.toString() + " device(s) connected", 12f, C.Text)
+                        PillButton("Open device scan", 190.dp, { onOpenPanel(Panel.SCAN) }, primary = true)
+                        PillButton("Device connections", 190.dp, { onOpenSheet(Sheet.DEVICES) })
+                    }
+                    "RGB" -> {
+                        T(state.selRgb.size.toString() + " selected · " + state.rgbItems.count { it.on } + " on", 12f, C.Text)
+                        PillButton("Open RGB controls", 190.dp, { onOpenPanel(Panel.RGB) }, primary = true)
+                        PillButton("Firmware / GPIO setup", 210.dp, { onOpenSheet(Sheet.FIRMWARE) })
+                        PillButton("Effects catalogue", 190.dp, { onOpenSheet(Sheet.EFFECTS) })
+                    }
+                    "Switches" -> {
+                        T(state.selSw.size.toString() + " selected · " + state.swItems.count { it.on } + " on", 12f, C.Text)
+                        PillButton("Open switch controls", 200.dp, { onOpenPanel(Panel.SWITCH) }, primary = true)
+                        PillButton("Switch configuration", 200.dp, { onOpenSheet(Sheet.SWITCH) })
+                    }
+                    "Colour" -> {
+                        T("R " + state.r + " · G " + state.g + " · B " + state.b, 12f, C.Text)
+                        PillButton("Open RGB controls", 190.dp, { onOpenPanel(Panel.RGB) }, primary = true)
+                        PillButton("Effects catalogue", 190.dp, { onOpenSheet(Sheet.EFFECTS) })
+                    }
+                    "Brightness" -> {
+                        T(state.br.toString() + " / 255 · " + (state.br * 100 / 255) + "%", 12f, C.Text)
+                        PillButton("Open RGB controls", 190.dp, { onOpenPanel(Panel.RGB) }, primary = true)
+                    }
+                    "Effect" -> {
+                        PillButton("Effects catalogue", 190.dp, { onOpenSheet(Sheet.EFFECTS) }, primary = true)
+                        PillButton("Theme configuration", 190.dp, { onOpenSheet(Sheet.THEME) })
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { BackBtn(onBack) }
+        }
+    }
+}
 @Composable
 private fun ChannelSlider(x: androidx.compose.ui.unit.Dp, y: androidx.compose.ui.unit.Dp, letter: String, value: Int, on: Boolean, color: Color, onChange: (Int) -> Unit, onToggle: () -> Unit) {
     HSlider(value, 255, if (on) color else C.Off, onChange, Modifier.offset(x, y).width(212.dp))
