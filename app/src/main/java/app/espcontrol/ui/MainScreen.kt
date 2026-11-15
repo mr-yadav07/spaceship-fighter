@@ -116,8 +116,8 @@ fun MainScreen(vm: ControlViewModel) {
             ) { T(if (anySelOn) "ON" else "OFF", 15f, weight = FontWeight.SemiBold) }
         }
 
-        Column(Modifier.offset(288.dp, (303f + 184f * (1f - s.br / 255f)).dp).width(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.clip(RoundedCornerShape(8.dp)).background(C.Track).padding(horizontal = 6.dp, vertical = 2.dp)) { T("${s.br}", 11f, weight = FontWeight.SemiBold) }
+        Column(Modifier.offset(282.dp, (303f + 184f * (1f - s.br / 255f)).dp).width(42.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.width(42.dp).clip(RoundedCornerShape(8.dp)).background(C.Track).padding(horizontal = 4.dp, vertical = 2.dp), contentAlignment = Alignment.Center) { T("${s.br}", 11f, weight = FontWeight.SemiBold) }
         }
         VSlider(s.br, 255, { vm.setBrightness(it) }, Modifier.offset(323.dp, 312.dp).size(14.dp, 184.dp))
 
@@ -226,7 +226,7 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun ChannelSlider(x: androidx.compose.ui.unit.Dp, y: androidx.compose.ui.unit.Dp, letter: String, value: Int, on: Boolean, color: Color, onChange: (Int) -> Unit, onToggle: () -> Unit) {
     HSlider(value, 255, if (on) color else C.Off, onChange, Modifier.offset(x, y).width(212.dp))
-    ChannelButton(letter, on, color, if (letter == "B") Color.White else Color(0xFF0E0F14), onToggle, Modifier.offset(344.dp, y - 4.dp))
+    ChannelButton(letter, on, color, if (letter == "B") Color.White else Color(0xFF0E0F14), onToggle, Modifier.offset(344.dp, y + 16.dp))
 }
 
 @Composable
