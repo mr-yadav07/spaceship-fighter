@@ -189,7 +189,7 @@ fun Revolver(
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.offset(g.panLeft.dp, g.panTop.dp).size(g.panWidth.dp, g.panHeight.dp)
-                .clip(CircleShape).background(Color(0x8C12141C)).border(1.dp, C.Line, CircleShape)
+                .clip(CircleShape).background(Color(0x8C12141C))
                             .pointerInput(ui, finite) {
                 val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
@@ -202,6 +202,7 @@ fun Revolver(
                     var speed = 0f
                     var first = true
                     var dragging = false
+                    var freeVelocity = 0f
                     while (true) {
                         val ev = awaitPointerEvent()
                         val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
@@ -210,9 +211,11 @@ fun Revolver(
                                 tap(down.position.x / density, down.position.y / density)
                             } else if (curMode == ScrollMode.FREE && curSens > 0) {
                                 val s = curSens / 100f
-                                val vy = vt.calculateVelocity().y
-                                val v = (-(vy / density / 1000f) / g.spacing * (0.35f + s * 0.9f)).coerceIn(-0.05f, 0.05f)
-                                if (abs(v) > 0.0004f) fling(v, s) else snap()
+                                val tracked = -(vt.calculateVelocity().y / density / 1000f) / g.spacing
+                                val v = (if (abs(tracked) > 0.001f) tracked else freeVelocity) *
+                                    (0.7f + s * 1.1f)
+                                val bounded = v.coerceIn(-0.075f, 0.075f)
+                                if (abs(bounded) > 0.00025f) fling(bounded, s) else snap()
                             } else {
                                 snap()
                             }
@@ -234,7 +237,12 @@ fun Revolver(
                                 }
                                 ScrollMode.FREE -> 1f + s * 2f
                             }
-                            rot += -dyDp * gain / g.spacing
+                            val deltaItems = -dyDp * gain / g.spacing
+                            rot += deltaItems
+                            if (curMode == ScrollMode.FREE) {
+                                val instant = deltaItems / dt
+                                freeVelocity = if (first) instant else freeVelocity * 0.55f + instant * 0.45f
+                            }
                             ch.consume()
                         }
                         lastY = ch.position.y
@@ -243,7 +251,6 @@ fun Revolver(
                 }
             },
         )
-        Box(Modifier.offset((390f - g.r).dp, (CY - g.b).dp).size((g.r * 2).dp, (g.b * 2).dp).border(1.dp, Color(0x24FFFFFF), CircleShape))
         RevolverArrow(Modifier.offset(334.dp, (CY - 150f).dp), up = true) { stepBy(-1f) }
         RevolverArrow(Modifier.offset(334.dp, (CY + 116f).dp), up = false) { stepBy(1f) }
         for (s in slots(n, rot, ui, finite)) {
