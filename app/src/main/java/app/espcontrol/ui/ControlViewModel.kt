@@ -217,11 +217,11 @@ class ControlViewModel(app: Application) : AndroidViewModel(app) {
             if (targets.isEmpty()) { msg("Sync: no RGB selected"); return }
             val snapshots = targets.associate { item ->
                 val saved = if (state.demo) {
-                    RgbSnapshot(item.color.red.toInt(), item.color.green.toInt(), item.color.blue.toInt(), state.br, item.on)
+                    RgbSnapshot((item.color.red * 255).toInt(), (item.color.green * 255).toInt(), (item.color.blue * 255).toInt(), state.br, item.on)
                 } else {
                     val current = ui.value.devices.firstOrNull { it.id == item.devId }?.rgbStates?.get(item.out)
-                    RgbSnapshot(current?.r ?: item.color.red.toInt(), current?.g ?: item.color.green.toInt(),
-                        current?.b ?: item.color.blue.toInt(), current?.brightness ?: state.br, current?.on ?: item.on)
+                    RgbSnapshot(current?.r ?: (item.color.red * 255).toInt(), current?.g ?: (item.color.green * 255).toInt(),
+                        current?.b ?: (item.color.blue * 255).toInt(), current?.brightness ?: state.br, current?.on ?: item.on)
                 }
                 item.key to saved
             }
