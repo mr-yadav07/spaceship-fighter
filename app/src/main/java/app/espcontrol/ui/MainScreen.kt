@@ -60,6 +60,8 @@ fun MainScreen(vm: ControlViewModel) {
     val s by vm.ui.collectAsState()
     var panel by remember { mutableStateOf(Panel.NONE) }
     var sheet by remember { mutableStateOf(Sheet.NONE) }
+    var settingsSheet by remember { mutableStateOf(Sheet.NONE) }
+    var menuSheet by remember { mutableStateOf(Sheet.NONE) }
     var infoOpen by remember { mutableStateOf(false) }
     var revolverUi by remember { mutableStateOf(1) }
     var selectedTheme by remember { mutableStateOf("Dark") }
@@ -89,7 +91,7 @@ fun MainScreen(vm: ControlViewModel) {
                 .background(Brush.verticalGradient(when (selectedTheme) { "Light" -> listOf(Color(0xFFE9EBF2), Color(0xFFD4D8E3)); "AMOLED" -> listOf(Color.Black, Color.Black); else -> listOf(C.Bg1, C.Bg2) }))
                 .clip(RoundedCornerShape(0.dp)),
         ) {
-        Box(Modifier.fillMaxSize().blur(if (panel != Panel.NONE || sheet != Sheet.NONE || infoOpen) 6.dp else 0.dp)) {
+        Box(Modifier.fillMaxSize()) {
         // glow behind the disc
         Box(
             Modifier.offset(29.dp, 239.dp).size(330.dp).clip(CircleShape)
@@ -138,11 +140,11 @@ fun MainScreen(vm: ControlViewModel) {
 
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(tween(250)), exit = fadeOut(tween(250))) {
             when (panel) {
-                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi, revolverController, revolverScope) { open -> sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
+                Panel.SETTINGS -> SettingsRevolver(vm, s, revolverUi, revolverController, revolverScope) { open -> settingsSheet = open; sheet = open; if (open != Sheet.NONE) panel = Panel.NONE }
                 Panel.SCAN -> ScanPanel(s, vm) { panel = Panel.NONE }
                 Panel.RGB -> ListRevolver(s.rgbItems, s.selRgb, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
                 Panel.SWITCH -> ListRevolver(s.swItems, s.selSw, s.mode, s.sens[s.mode] ?: 0, revolverUi, revolverController, revolverScope, vm::toggleSelect, vm::toggleItemOn)
-                Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> panel = Panel.NONE; sheet = target })
+                Panel.MENU -> MenuPanel(onClose = { panel = Panel.NONE }, onOpen = { target -> menuSheet = target; panel = Panel.NONE; sheet = target })
                 else -> {}
             }
         }
@@ -166,11 +168,19 @@ fun MainScreen(vm: ControlViewModel) {
 
         SideColumn(
             panel,
-            onSettings = { panel = if (panel == Panel.SETTINGS) Panel.NONE else Panel.SETTINGS },
-            onScan = { panel = if (panel == Panel.SCAN) Panel.NONE else Panel.SCAN },
-            onRgb = { panel = if (panel == Panel.RGB) Panel.NONE else Panel.RGB },
-            onSwitch = { panel = if (panel == Panel.SWITCH) Panel.NONE else Panel.SWITCH },
-            onMenu = { panel = if (panel == Panel.MENU) Panel.NONE else Panel.MENU },
+            onSettings = {
+                if (panel == Panel.SETTINGS) panel = Panel.NONE
+                else if (settingsSheet != Sheet.NONE) { panel = Panel.NONE; sheet = if (sheet == settingsSheet) Sheet.NONE else settingsSheet }
+                else { sheet = Sheet.NONE; panel = Panel.SETTINGS }
+            },
+            onScan = { sheet = Sheet.NONE; panel = if (panel == Panel.SCAN) Panel.NONE else Panel.SCAN },
+            onRgb = { sheet = Sheet.NONE; panel = if (panel == Panel.RGB) Panel.NONE else Panel.RGB },
+            onSwitch = { sheet = Sheet.NONE; panel = if (panel == Panel.SWITCH) Panel.NONE else Panel.SWITCH },
+            onMenu = {
+                if (panel == Panel.MENU) panel = Panel.NONE
+                else if (menuSheet != Sheet.NONE) { panel = Panel.NONE; sheet = if (sheet == menuSheet) Sheet.NONE else menuSheet }
+                else { sheet = Sheet.NONE; panel = Panel.MENU }
+            },
         )
         }
     }
@@ -243,7 +253,7 @@ private fun ActionRow(
         PillButton(if (allSelected) "Deselect All" else "Select All", 92.dp, onSelectAll)
         Spacer(Modifier.width(6.dp))
         PillButton("On/Off", 60.dp, onPower)
-        Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.width(34.dp))
     }
 }
 
