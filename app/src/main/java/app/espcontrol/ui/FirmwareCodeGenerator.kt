@@ -9,7 +9,9 @@ data class FirmwareCandidate(
 )
 
 object FirmwareCodeGenerator {
-    fun generate(deviceName: String, candidates: List<FirmwareCandidate>): String {
+    private val presetEffects = listOf(1 to "Rainbow", 2 to "Pulse", 3 to "Color Cycle", 4 to "Chase")
+
+    fun generate(deviceName: String, candidates: List<FirmwareCandidate>, enabledEffects: Set<Int> = presetEffects.map { it.first }.toSet()): String {
         val valid = candidates.isNotEmpty() && candidates.size <= 12 &&
             candidates.map { it.gpio.toIntOrNull() }.distinct().size == candidates.size &&
             candidates.all {
@@ -29,7 +31,10 @@ object FirmwareCodeGenerator {
             if (candidate.type == "RGB") "  {RGB_KIND, $id, $pin, ${candidate.leds.toInt()}, \"$name\"}"
             else "  {SWITCH_KIND, $id, $pin, 0, \"$name\"}"
         }
+        val selectedEffects = presetEffects.filter { it.first in enabledEffects }
+        val effectRows = selectedEffects.joinToString(",\\n") { (id, name) -> "  {$id, \\"$name\\"}" }.ifBlank { "  {0,\\"\\"}" }
         return SOURCE.replace("@DEVICE@", safeName).replace("@CANDIDATES@", rows)
+            .replace("@EFFECTS@", effectRows).replace("@EFFECT_COUNT@", selectedEffects.size.toString())
     }
 
     private val SOURCE = """
@@ -61,7 +66,8 @@ struct Effect { uint8_t id; const char* name; };
 static const Candidate CANDIDATES[] = {
 @CANDIDATES@
 };
-static const Effect EFFECTS[] = {{1,"Rainbow"},{2,"Pulse"},{3,"Color Cycle"},{4,"Chase"}};
+static const Effect EFFECTS[] = {@EFFECTS@};
+static constexpr size_t EFFECT_COUNT = @EFFECT_COUNT@;
 static constexpr size_t CANDIDATE_COUNT = sizeof(CANDIDATES) / sizeof(CANDIDATES[0]);
 
 struct State {
@@ -97,7 +103,7 @@ static int indexOf(uint8_t kind, uint8_t id) {
 }
 static bool hasEffect(uint8_t id) {
   if (!id) return true;
-  for (const auto& e : EFFECTS) if (e.id==id) return true;
+  for (size_t i=0;i<EFFECT_COUNT;i++) if (EFFECTS[i].id==id) return true;
   return false;
 }
 static void sendFrame(uint8_t type, const std::vector<uint8_t>& payload) {
@@ -139,8 +145,8 @@ static void sendCaps() {
     if (c.kind==RGB_KIND) { p.push_back(c.leds&255); p.push_back(c.leds>>8); }
     n=strlen(c.name); p.push_back((uint8_t)n); p.insert(p.end(),c.name,c.name+n);
   }
-  p.push_back((uint8_t)(sizeof(EFFECTS)/sizeof(EFFECTS[0])));
-  for (const auto& e:EFFECTS) { p.push_back(e.id); n=strlen(e.name); p.push_back((uint8_t)n); p.insert(p.end(),e.name,e.name+n); }
+  p.push_back((uint8_t)EFFECT_COUNT);
+  for (size_t i=0;i<EFFECT_COUNT;i++) { const auto& e=EFFECTS[i]; p.push_back(e.id); n=strlen(e.name); p.push_back((uint8_t)n); p.insert(p.end(),e.name,e.name+n); }
   sendFrame(CAPS,p);
 }
 static void sendStatus() {
